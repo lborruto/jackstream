@@ -48,40 +48,43 @@ Stremio app
 ## Features
 
 - 🧲 Direct streaming from Jackett results, no debrid, no qBittorrent
-- 🔒 Private-tracker friendly: uses Jackett's proxied `.torrent` URLs with passkeys; DHT/LSD disabled
-- ⚙️ Per-user credentials encoded in the addon URL (no server-side storage)
+- 🔒 Private-tracker friendly: uses Jackett's proxied `.torrent` URLs with passkeys; DHT / LSD / µTP disabled
+- 🔐 HTTPS out of the box via a bundled wildcard cert — no reverse proxy needed for LAN clients
+- ⚙️ Per-user credentials encoded in the addon URL (zero server-side storage)
+- 💾 Client-side config persistence (localStorage) + bookmarkable `/<config>/configure` URL
 - 🎬 Movies + TV series (anime covered via category `5070`)
 - 🌍 TMDB-powered title resolution with FR/EN variants for better search coverage
 - 🏷️ Quality / source / HDR / codec / audio detection
-- 📦 Single Docker container, no volumes, ARM64-ready
+- 🎚️ Advanced filters: preferred language, quality floor/ceiling, size bounds, blacklist keywords
+- 📦 Single Docker container, no volumes, multi-arch (amd64 + arm64)
 
 ## Prerequisites
 
 - A running **Jackett** instance reachable from this container.
 - A free **TMDB** API key → <https://www.themoviedb.org/settings/api>.
-- **HTTPS** in front of the addon if you expose it outside `127.0.0.1` — Stremio refuses non-localhost HTTP.
+- Docker + Docker Compose on the host.
 
 ## Installation
 
 ### Docker (one-liner)
 
 ```bash
-docker run -d --name jackstream -p 7000:7000 --restart unless-stopped ghcr.io/OWNER/jackstream:latest
+docker run -d --name jackstream \
+  -p 7000:7000 -p 7001:7001 \
+  --restart unless-stopped \
+  ghcr.io/OWNER/jackstream:latest
 ```
 
 ### Docker Compose
 
 ```yaml
-version: "3.8"
 services:
   jackstream:
     image: ghcr.io/OWNER/jackstream:latest
     container_name: jackstream
     ports:
-      - "7000:7000"
-    environment:
-      - PORT=7000
-      - NODE_ENV=production
+      - "7000:7000"   # HTTP (configure page + localhost Stremio)
+      - "7001:7001"   # HTTPS (for Stremio clients on other LAN devices)
     restart: unless-stopped
 ```
 
@@ -96,11 +99,31 @@ npm start
 
 ## Configuration
 
-1. Open `http://<host>:7000/configure`.
-2. Fill in your Jackett URL + API key, TMDB API key, and the **public URL** where this addon is reachable (e.g. `https://addon.example.com`).
-3. Click *Test Jackett* and *Test TMDB* to verify connectivity.
-4. Click *Install in Stremio* — the page launches `stremio://...` with your base64url-encoded config.
-5. The generated HTTP URL is shown for manual install on other devices.
+1. Open `http://<server-ip>:7000/configure` from any device on your LAN.
+2. Fill in:
+   - **Jackett URL** (e.g. `http://<server-ip>:9117`) and its API key.
+   - **TMDB API key**.
+   - **Addon public URL / LAN IP** — just type your server's LAN IP (e.g. `192.168.0.15`). The page auto-converts it to a valid HTTPS URL (see [HTTPS details](#https-details)).
+3. Click *Test Jackett* / *Test TMDB* to verify connectivity (live ping of both).
+4. *(Optional)* expand **Advanced filters** to set language preference, quality bounds, size limits, or blacklist keywords.
+5. Click *Install in Stremio* — the native Stremio app opens and installs.
+6. The HTTPS URL is also shown so you can paste it into Stremio manually on any device (useful for TVs without a browser).
+
+Your inputs are saved to `localStorage` so reloading `/configure` re-populates the form. You can also bookmark `http://<server-ip>:7000/<base64>/configure` to carry the full config between browsers.
+
+## Advanced filters
+
+All optional. Defaults produce the same behavior as earlier versions.
+
+| Setting | Effect |
+|---|---|
+| **Preferred audio language** | Sort boost for matching audio (FRENCH / MULTI / VOSTFR / ENG). `FRENCH` also boosts MULTI releases; same for `ENG`. Does not hide non-matching results. |
+| **Min / Max quality** | Hard filter. Drops results above/below the chosen tier. |
+| **Min size (MB)** | Drops "fake" low-size releases. |
+| **Max size (GB)** | Drops oversized releases (useful for slow connections / small disks). |
+| **Blacklist keywords** | Comma-separated list (case-insensitive, word-boundary). Drops results whose title matches any keyword — e.g. `CAM, HDCAM, TELESYNC`. |
+
+All filters are stored in the base64-encoded addon URL, so different Stremio installs can use different filter profiles against the same backend.
 
 ## HTTPS details
 
@@ -136,7 +159,16 @@ Works with Caddy-issued certs, mkcert, Let's Encrypt, or anything else.
 
 ### Disabling HTTPS
 
-Set `HTTPS_DISABLED=1` to skip starting the HTTPS listener (HTTP-only). Useful if you front the addon with Caddy/Nginx that already terminates TLS.
+Set `HTTPS_DISABLED=1` to skip the HTTPS listener (HTTP-only). Useful if you front the addon with Caddy / Nginx / Traefik that already terminates TLS.
+
+### Refreshing the bundled cert
+
+The cert expires every ~60 days (Let's Encrypt rotation). Before a rebuild:
+
+```bash
+./scripts/refresh-certs.sh
+git commit -am "chore: refresh bundled local-ip cert"
+```
 
 ## FAQ
 
@@ -157,6 +189,12 @@ No shared volume, no second container, native HTTP Range support, and the Jacket
 
 **Stremio desktop vs TV?**
 Both work. `notWebReady: true` tells Stremio to use the native player rather than the web player.
+
+**The *Install in Stremio* button did nothing / the URL lost the `:7001` port.**
+Some Stremio clients (older Windows builds in particular) mishandle the port in `stremio://` deep-link URIs. Workaround: copy the `https://…:7001/<base64>/manifest.json` URL shown below the button, then in Stremio click the puzzle-piece icon → paste into *Add-on Repository URL*.
+
+**Loading failed when I click a stream.**
+Most often because the container restarted (e.g. Komodo redeploy) and the in-memory `torrentStore` was wiped while Stremio still had a cached list of stream URLs. Close and re-open the movie in Stremio to force a fresh stream-list fetch.
 
 ## Environment variables
 
