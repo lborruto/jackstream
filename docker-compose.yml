@@ -1,6 +1,6 @@
 services:
   jackstream:
-    image: jackstream:latest
+    image: ghcr.io/lborruto/jackstream:latest
     container_name: jackstream
     ports:
       - "7000:7000"
