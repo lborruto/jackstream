@@ -17,6 +17,14 @@ const { addonBuilder } = require('stremio-addon-sdk')
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PORT = parseInt(process.env.PORT || '7000', 10)
 
+let lastMaxConcurrent = parseInt(process.env.MAX_CONCURRENT_TORRENTS || '3', 10)
+
+function updateConcurrencyFromConfig(config) {
+  if (Number.isFinite(config.maxConcurrentTorrents)) {
+    lastMaxConcurrent = config.maxConcurrentTorrents
+  }
+}
+
 const manifest = {
   id: 'community.jackstream',
   version: '1.0.0',
@@ -98,6 +106,7 @@ export function buildApp() {
     let config
     try {
       config = loadConfig(req.params.config)
+      updateConcurrencyFromConfig(config)
     } catch (err) {
       return res.status(400).json({ error: 'invalid_config', detail: err.message })
     }
@@ -138,7 +147,8 @@ export function buildApp() {
 
   app.get('/stream/:config/:torrentId/:fileIdx', async (req, res) => {
     try {
-      loadConfig(req.params.config) // validate but do not use
+      const config = loadConfig(req.params.config)
+      updateConcurrencyFromConfig(config)
     } catch (err) {
       return res.status(400).json({ error: 'invalid_config', detail: err.message })
     }
@@ -196,7 +206,7 @@ export { encodeConfig }
 
 setInterval(() => {
   try {
-    webtorrent.cleanup(parseInt(process.env.MAX_CONCURRENT_TORRENTS || '3', 10))
+    webtorrent.cleanup(lastMaxConcurrent)
   } catch (err) {
     console.warn('[cleanup]', err.message)
   }
