@@ -8,6 +8,19 @@
 
 Self-hosted Stremio addon — query your Jackett and stream torrents instantly via an embedded WebTorrent client. No debrid, no qBittorrent, one Docker container.
 
+## Quick start (homelab on LAN)
+
+1. On your homelab/server, with Docker installed:
+   ```bash
+   docker compose up -d
+   ```
+2. From any device on the same LAN, open `http://<server-ip>:7000/configure`.
+3. Fill in your Jackett URL + API key, your TMDB API key, and set **Addon public URL** to `http://<server-ip>:7000` (the same URL you're looking at, with your server's LAN IP).
+4. Click *Install in Stremio* — the native Stremio app opens and installs the addon.
+5. Pick a movie or episode in Stremio — Jackett torrents appear as sources, one click plays.
+
+No HTTPS, no reverse proxy, no cert trust — native Stremio apps (desktop, Android, Android TV, iOS, Apple TV) accept plain HTTP on the LAN. HTTPS is only needed if you want the addon to work in the web client at `web.stremio.com` ([see below](#https-only-needed-for-webstremiocom)).
+
 ## Architecture
 
 ```
@@ -89,9 +102,11 @@ npm start
 4. Click *Install in Stremio* — the page launches `stremio://...` with your base64url-encoded config.
 5. The generated HTTP URL is shown for manual install on other devices.
 
-## HTTPS (required outside localhost)
+## HTTPS (only needed for web.stremio.com)
 
-Stremio refuses non-localhost HTTP addons. Put a reverse proxy in front.
+Native Stremio apps (desktop, Android, Android TV, iOS, Apple TV) accept plain HTTP addons on the LAN. You only need HTTPS if you want the addon to work in the web client at `https://web.stremio.com`, which refuses mixed HTTP/HTTPS content.
+
+If you do need HTTPS, put a reverse proxy in front.
 
 ### Caddy (one line)
 
