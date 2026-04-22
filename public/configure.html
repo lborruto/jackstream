@@ -290,6 +290,10 @@
         </div>
 
         <div class="url-box" id="urlBox">Fill the form to generate your addon URL.</div>
+        <div style="font-size: 0.75rem; color: var(--muted); margin-top: 0.35rem">
+          If *Install in Stremio* doesn't work (some clients mishandle the port),
+          copy the URL above and paste it into Stremio's <em>Add-on Repository URL</em> field.
+        </div>
       </form>
 
       <div class="footer">
@@ -423,11 +427,10 @@
         const b64 = toB64Url(JSON.stringify(cfg))
         const base = cfg.addonPublicUrl.replace(/\/$/, '')
         const httpUrl = `${base}/${b64}/manifest.json`
-        // Use the stremio://install?url=… form rather than plain scheme swap:
-        // some Stremio clients (notably Windows desktop) strip the port when
-        // parsing stremio://host:PORT/path, producing an unreachable URL.
-        // Wrapping the full URL in a query param preserves the port verbatim.
-        const stremioUrl = `stremio://install?url=${encodeURIComponent(httpUrl)}`
+        // Canonical Stremio deep link: replace the scheme. If your Stremio
+        // client ever drops the port, copy the HTTPS URL shown below and
+        // paste it into Stremio's "Add-on Repository URL" field instead.
+        const stremioUrl = httpUrl.replace(/^https?:\/\//, 'stremio://')
         return { httpUrl, stremioUrl }
       }
 
