@@ -1,7 +1,7 @@
 import { createCache } from './cache.js'
 
 const TMDB_BASE = 'https://api.themoviedb.org/3'
-const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000
+const DEFAULT_TTL_MS = (parseInt(process.env.CACHE_TTL_MINUTES, 10) || 1440) * 60 * 1000
 const REQUEST_TIMEOUT_MS = parseInt(process.env.REQUEST_TIMEOUT_MS || '8000', 10)
 
 const cache = createCache()
