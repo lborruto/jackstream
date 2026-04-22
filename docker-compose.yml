@@ -1,14 +1,7 @@
-version: "3.8"
 services:
   jackstream:
-    image: ghcr.io/OWNER/jackstream:latest
-    # Or build from source instead of pulling: comment out `image:` above and
-    # uncomment the next line.
-    # build: .
+    image: jackstream:latest
     container_name: jackstream
     ports:
       - "7000:7000"
-    environment:
-      - PORT=7000
-      - NODE_ENV=production
     restart: unless-stopped
