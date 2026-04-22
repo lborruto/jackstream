@@ -1,8 +1,8 @@
 # jackstream
 
-[![Docker Pulls](https://img.shields.io/docker/pulls/OWNER/jackstream.svg)](https://hub.docker.com/r/OWNER/jackstream)
-[![GHCR](https://img.shields.io/badge/ghcr.io-OWNER%2Fjackstream-blue)](https://ghcr.io/OWNER/jackstream)
-[![CI](https://github.com/OWNER/jackstream/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/OWNER/jackstream/actions)
+[![Docker Pulls](https://img.shields.io/docker/pulls/lborruto/jackstream.svg)](https://hub.docker.com/r/lborruto/jackstream)
+[![GHCR](https://img.shields.io/badge/ghcr.io-lborruto%2Fjackstream-blue)](https://ghcr.io/lborruto/jackstream)
+[![CI](https://github.com/lborruto/jackstream/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/lborruto/jackstream/actions)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-20%2B-brightgreen.svg)](https://nodejs.org)
 
@@ -72,7 +72,7 @@ Stremio app
 docker run -d --name jackstream \
   -p 7000:7000 -p 7001:7001 \
   --restart unless-stopped \
-  ghcr.io/OWNER/jackstream:latest
+  ghcr.io/lborruto/jackstream:latest
 ```
 
 ### Docker Compose
@@ -80,7 +80,7 @@ docker run -d --name jackstream \
 ```yaml
 services:
   jackstream:
-    image: ghcr.io/OWNER/jackstream:latest
+    image: ghcr.io/lborruto/jackstream:latest
     container_name: jackstream
     ports:
       - "7000:7000"   # HTTP (configure page + localhost Stremio)
@@ -91,7 +91,7 @@ services:
 ### From source (development)
 
 ```bash
-git clone https://github.com/OWNER/jackstream.git
+git clone https://github.com/lborruto/jackstream.git
 cd jackstream
 npm install
 npm start
@@ -115,13 +115,13 @@ Your inputs are saved to `localStorage` so reloading `/configure` re-populates t
 
 All optional. Defaults produce the same behavior as earlier versions.
 
-| Setting | Effect |
-|---|---|
+| Setting                      | Effect                                                                                                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Preferred audio language** | Sort boost for matching audio (FRENCH / MULTI / VOSTFR / ENG). `FRENCH` also boosts MULTI releases; same for `ENG`. Does not hide non-matching results. |
-| **Min / Max quality** | Hard filter. Drops results above/below the chosen tier. |
-| **Min size (MB)** | Drops "fake" low-size releases. |
-| **Max size (GB)** | Drops oversized releases (useful for slow connections / small disks). |
-| **Blacklist keywords** | Comma-separated list (case-insensitive, word-boundary). Drops results whose title matches any keyword — e.g. `CAM, HDCAM, TELESYNC`. |
+| **Min / Max quality**        | Hard filter. Drops results above/below the chosen tier.                                                                                                 |
+| **Min size (MB)**            | Drops "fake" low-size releases.                                                                                                                         |
+| **Max size (GB)**            | Drops oversized releases (useful for slow connections / small disks).                                                                                   |
+| **Blacklist keywords**       | Comma-separated list (case-insensitive, word-boundary). Drops results whose title matches any keyword — e.g. `CAM, HDCAM, TELESYNC`.                    |
 
 All filters are stored in the base64-encoded addon URL, so different Stremio installs can use different filter profiles against the same backend.
 
@@ -143,7 +143,7 @@ Mount a cert + key and point the addon at them:
 ```yaml
 services:
   jackstream:
-    image: ghcr.io/OWNER/jackstream:latest
+    image: ghcr.io/lborruto/jackstream:latest
     ports:
       - "7000:7000"
       - "7001:7001"
@@ -198,18 +198,18 @@ Most often because the container restarted (e.g. Komodo redeploy) and the in-mem
 
 ## Environment variables
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `PORT` | `7000` | Port to listen on |
-| `CACHE_TTL_MINUTES` | `1440` | TMDB cache TTL |
-| `REQUEST_TIMEOUT_MS` | `8000` | Jackett/TMDB timeout |
-| `STREAM_READY_MB` | `5` | MB to buffer before streaming |
-| `STREAM_READY_TIMEOUT_S` | `60` | Max wait for first pieces |
-| `TORRENT_IDLE_TIMEOUT_MIN` | `30` | Idle minutes before stopping a torrent |
-| `HTTPS_PORT` | `7001` | Port for the HTTPS listener |
-| `HTTPS_CERT_PATH` | `./certs/fullchain.pem` | Path to TLS certificate (PEM) |
-| `HTTPS_KEY_PATH` | `./certs/key.pem` | Path to TLS private key (PEM) |
-| `HTTPS_DISABLED` | _(unset)_ | Set to `1` to disable the HTTPS listener |
+| Variable                   | Default                 | Meaning                                  |
+| -------------------------- | ----------------------- | ---------------------------------------- |
+| `PORT`                     | `7000`                  | Port to listen on                        |
+| `CACHE_TTL_MINUTES`        | `1440`                  | TMDB cache TTL                           |
+| `REQUEST_TIMEOUT_MS`       | `8000`                  | Jackett/TMDB timeout                     |
+| `STREAM_READY_MB`          | `5`                     | MB to buffer before streaming            |
+| `STREAM_READY_TIMEOUT_S`   | `60`                    | Max wait for first pieces                |
+| `TORRENT_IDLE_TIMEOUT_MIN` | `30`                    | Idle minutes before stopping a torrent   |
+| `HTTPS_PORT`               | `7001`                  | Port for the HTTPS listener              |
+| `HTTPS_CERT_PATH`          | `./certs/fullchain.pem` | Path to TLS certificate (PEM)            |
+| `HTTPS_KEY_PATH`           | `./certs/key.pem`       | Path to TLS private key (PEM)            |
+| `HTTPS_DISABLED`           | _(unset)_               | Set to `1` to disable the HTTPS listener |
 
 ## Contributing
 
