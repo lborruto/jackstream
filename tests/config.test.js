@@ -53,4 +53,84 @@ describe('validateConfig', () => {
     expect(out.minSeeders).toBe(1)
     expect(out.maxConcurrentTorrents).toBe(3)
   })
+
+  describe('advanced filter fields', () => {
+    test('default values when fields are absent', () => {
+      const out = validateConfig(sample)
+      expect(out.preferredLanguage).toBeNull()
+      expect(out.maxQuality).toBeNull()
+      expect(out.minQuality).toBeNull()
+      expect(out.maxSizeGb).toBeNull()
+      expect(out.minSizeMb).toBeNull()
+      expect(out.blacklistKeywords).toEqual([])
+    })
+
+    test.each(['FRENCH', 'MULTI', 'VOSTFR', 'ENG'])(
+      'preferredLanguage accepts %s',
+      lang => {
+        const out = validateConfig({ ...sample, preferredLanguage: lang })
+        expect(out.preferredLanguage).toBe(lang)
+      }
+    )
+
+    test('preferredLanguage invalid value falls back to null', () => {
+      const out = validateConfig({ ...sample, preferredLanguage: 'KLINGON' })
+      expect(out.preferredLanguage).toBeNull()
+    })
+
+    test.each(['4K', '1080p', '720p', '480p'])('maxQuality accepts %s', q => {
+      const out = validateConfig({ ...sample, maxQuality: q })
+      expect(out.maxQuality).toBe(q)
+    })
+
+    test('maxQuality invalid value falls back to null', () => {
+      const out = validateConfig({ ...sample, maxQuality: '8K' })
+      expect(out.maxQuality).toBeNull()
+    })
+
+    test.each(['4K', '1080p', '720p', '480p'])('minQuality accepts %s', q => {
+      const out = validateConfig({ ...sample, minQuality: q })
+      expect(out.minQuality).toBe(q)
+    })
+
+    test('minQuality invalid value falls back to null', () => {
+      const out = validateConfig({ ...sample, minQuality: 'garbage' })
+      expect(out.minQuality).toBeNull()
+    })
+
+    test('maxSizeGb accepts positive finite number', () => {
+      const out = validateConfig({ ...sample, maxSizeGb: 20 })
+      expect(out.maxSizeGb).toBe(20)
+    })
+
+    test('maxSizeGb zero/negative/NaN falls back to null', () => {
+      expect(validateConfig({ ...sample, maxSizeGb: 0 }).maxSizeGb).toBeNull()
+      expect(validateConfig({ ...sample, maxSizeGb: -5 }).maxSizeGb).toBeNull()
+      expect(validateConfig({ ...sample, maxSizeGb: 'big' }).maxSizeGb).toBeNull()
+    })
+
+    test('minSizeMb accepts positive finite number', () => {
+      const out = validateConfig({ ...sample, minSizeMb: 500 })
+      expect(out.minSizeMb).toBe(500)
+    })
+
+    test('minSizeMb zero/negative/NaN falls back to null', () => {
+      expect(validateConfig({ ...sample, minSizeMb: 0 }).minSizeMb).toBeNull()
+      expect(validateConfig({ ...sample, minSizeMb: -1 }).minSizeMb).toBeNull()
+      expect(validateConfig({ ...sample, minSizeMb: 'tiny' }).minSizeMb).toBeNull()
+    })
+
+    test('blacklistKeywords accepts array of strings, trims and drops empties', () => {
+      const out = validateConfig({
+        ...sample,
+        blacklistKeywords: ['CAM', '  HDCAM  ', '', '   ', 42, null, 'TELESYNC'],
+      })
+      expect(out.blacklistKeywords).toEqual(['CAM', 'HDCAM', 'TELESYNC'])
+    })
+
+    test('blacklistKeywords non-array falls back to []', () => {
+      expect(validateConfig({ ...sample, blacklistKeywords: 'CAM' }).blacklistKeywords).toEqual([])
+      expect(validateConfig({ ...sample, blacklistKeywords: null }).blacklistKeywords).toEqual([])
+    })
+  })
 })

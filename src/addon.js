@@ -10,6 +10,7 @@ import { encodeConfig, decodeConfig, validateConfig } from './config.js'
 import { resolveImdbId, titleVariants, parseStremioId } from './tmdb.js'
 import { searchJackett, pingJackett } from './jackett.js'
 import { sortTorrents } from './sorter.js'
+import { filterTorrents } from './filter.js'
 import * as torrentStore from './torrentStore.js'
 import * as webtorrent from './webtorrent.js'
 
@@ -125,7 +126,8 @@ export function buildApp() {
       const meta = await resolveImdbId(rawId, config)
       const variants = titleVariants(meta)
       const results = await searchJackett(variants, meta, type, config)
-      const sorted = sortTorrents(results).slice(0, config.maxResults)
+      const filtered = filterTorrents(results, config)
+      const sorted = sortTorrents(filtered, config).slice(0, config.maxResults)
 
       const streams = sorted.map(t => {
         torrentStore.set(t.torrentId, {
@@ -193,6 +195,10 @@ export function buildApp() {
   })
 
   app.get('/configure', (_req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'public', 'configure.html'))
+  })
+
+  app.get('/:config/configure', (_req, res) => {
     res.sendFile(path.join(__dirname, '..', 'public', 'configure.html'))
   })
 

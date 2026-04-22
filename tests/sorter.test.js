@@ -65,4 +65,34 @@ describe('sortTorrents', () => {
     sortTorrents(input)
     expect(input).toEqual(copy)
   })
+
+  describe('preferredLanguage boost', () => {
+    test("preferredLanguage: 'FRENCH' promotes FRENCH above ENG at same quality", () => {
+      const fr = t({ quality: '1080p', source: 'WEB-DL', audio: 'FRENCH', seeders: 1 })
+      const en = t({ quality: '1080p', source: 'WEB-DL', audio: 'ENG', seeders: 100 })
+      const sorted = sortTorrents([en, fr], { preferredLanguage: 'FRENCH' })
+      expect(sorted[0]).toBe(fr)
+    })
+
+    test('FRENCH preference also boosts MULTI (LANG_INCLUDES.FRENCH has MULTI)', () => {
+      const multi = t({ quality: '1080p', source: 'WEB-DL', audio: 'MULTI', seeders: 1 })
+      const en = t({ quality: '1080p', source: 'WEB-DL', audio: 'ENG', seeders: 100 })
+      const sorted = sortTorrents([en, multi], { preferredLanguage: 'FRENCH' })
+      expect(sorted[0]).toBe(multi)
+    })
+
+    test('boost does not override quality cascade (4K ENG beats 1080p FRENCH)', () => {
+      const fr1080 = t({ quality: '1080p', source: 'WEB-DL', audio: 'FRENCH', seeders: 100 })
+      const en4k = t({ quality: '4K', source: 'WEB-DL', audio: 'ENG', seeders: 1 })
+      const sorted = sortTorrents([fr1080, en4k], { preferredLanguage: 'FRENCH' })
+      expect(sorted[0]).toBe(en4k)
+    })
+
+    test('undefined config keeps legacy behavior (no boost)', () => {
+      const fr = t({ quality: '1080p', source: 'WEB-DL', audio: 'FRENCH', seeders: 1 })
+      const en = t({ quality: '1080p', source: 'WEB-DL', audio: 'ENG', seeders: 100 })
+      const sorted = sortTorrents([fr, en])
+      expect(sorted[0]).toBe(en)
+    })
+  })
 })
