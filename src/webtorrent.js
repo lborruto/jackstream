@@ -165,7 +165,7 @@ export async function streamFile(torrentId, _fileIdx, req, res) {
       'Content-Type': contentType,
       'Accept-Ranges': 'bytes',
     })
-    file.createReadStream().pipe(res)
+    pipeWithCleanup(file.createReadStream(), req, res)
     return
   }
 
@@ -198,7 +198,22 @@ export async function streamFile(torrentId, _fileIdx, req, res) {
     'Content-Length': end - start + 1,
     'Content-Type': contentType,
   })
-  file.createReadStream({ start, end }).pipe(res)
+  pipeWithCleanup(file.createReadStream({ start, end }), req, res)
+}
+
+function pipeWithCleanup(rs, req, res) {
+  // Video players abandon range requests constantly as users scrub / the
+  // player refills its buffer. When that happens the HTTP response closes
+  // before the read stream is drained, which streamx reports as "Writable
+  // stream closed prematurely". That is expected behaviour, not an error —
+  // swallow it and destroy the read stream so torrent pieces aren't held.
+  rs.on('error', () => {})
+  const cleanup = () => {
+    if (!rs.destroyed) rs.destroy()
+  }
+  req.once('close', cleanup)
+  res.once('close', cleanup)
+  rs.pipe(res)
 }
 
 export function cleanup(maxConcurrent = 3) {
