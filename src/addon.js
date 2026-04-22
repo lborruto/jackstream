@@ -128,6 +128,7 @@ export function buildApp() {
       const results = await searchJackett(variants, meta, type, config)
       const filtered = filterTorrents(results, config)
       const sorted = sortTorrents(filtered, config).slice(0, config.maxResults)
+      console.log(`[streams] ${type}/${rawId} → ${sorted.length} result(s) after filter+sort`)
 
       const streams = sorted.map(t => {
         torrentStore.set(t.torrentId, {
@@ -155,16 +156,21 @@ export function buildApp() {
   })
 
   app.get('/stream/:config/:torrentId/:fileIdx', async (req, res) => {
+    const tid = req.params.torrentId
+    const fileIdx = req.params.fileIdx
+    console.log(`[stream] req torrentId=${tid} fileIdx=${fileIdx} range=${req.headers.range || '-'}`)
+    let config
     try {
-      const config = loadConfig(req.params.config)
-      updateConcurrencyFromConfig(config)
+      config = loadConfig(req.params.config)
     } catch (err) {
+      console.warn(`[stream] bad config: ${err.message}`)
       return res.status(400).json({ error: 'invalid_config', detail: err.message })
     }
+    updateConcurrencyFromConfig(config)
     try {
-      await webtorrent.streamFile(req.params.torrentId, parseInt(req.params.fileIdx, 10), req, res)
+      await webtorrent.streamFile(tid, parseInt(fileIdx, 10), req, res)
     } catch (err) {
-      console.error('[stream]', err.message)
+      console.error(`[stream] err for torrentId=${tid}: ${err.message}`)
       if (!res.headersSent) res.status(500).json({ error: 'internal' })
     }
   })
@@ -242,6 +248,14 @@ function tryStartHttps(app) {
     return null
   }
 }
+
+process.on('uncaughtException', err => {
+  console.error('[fatal] uncaughtException:', err && err.stack ? err.stack : err)
+})
+
+process.on('unhandledRejection', (reason, _promise) => {
+  console.error('[fatal] unhandledRejection:', reason && reason.stack ? reason.stack : reason)
+})
 
 const isMain = fileURLToPath(import.meta.url) === process.argv[1]
 if (isMain) {

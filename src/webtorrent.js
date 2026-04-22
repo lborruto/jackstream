@@ -27,7 +27,7 @@ const active = new Map()
 
 function getClient() {
   if (!client) {
-    client = new WebTorrent({ dht: false, lsd: false })
+    client = new WebTorrent({ dht: false, lsd: false, utp: false })
     client.on('error', err => console.error('[webtorrent] client error:', err.message))
   }
   return client
@@ -79,7 +79,10 @@ export async function addTorrent(torrentId) {
     return existing.torrent
   }
   const meta = torrentStore.get(torrentId)
-  if (!meta) throw new Error('torrent_not_found')
+  if (!meta) {
+    console.warn(`[webtorrent] store miss for torrentId=${torrentId} — likely restart or TTL expiry`)
+    throw new Error('torrent_not_found')
+  }
 
   const byHash = existingByInfoHash(meta.infoHash)
   const torrent = byHash || (await addNewTorrent(meta))
