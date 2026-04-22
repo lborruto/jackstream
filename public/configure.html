@@ -423,7 +423,11 @@
         const b64 = toB64Url(JSON.stringify(cfg))
         const base = cfg.addonPublicUrl.replace(/\/$/, '')
         const httpUrl = `${base}/${b64}/manifest.json`
-        const stremioUrl = httpUrl.replace(/^https?:\/\//, 'stremio://')
+        // Use the stremio://install?url=… form rather than plain scheme swap:
+        // some Stremio clients (notably Windows desktop) strip the port when
+        // parsing stremio://host:PORT/path, producing an unreachable URL.
+        // Wrapping the full URL in a query param preserves the port verbatim.
+        const stremioUrl = `stremio://install?url=${encodeURIComponent(httpUrl)}`
         return { httpUrl, stremioUrl }
       }
 
