@@ -27,7 +27,11 @@ function extractInfoHash(magnetUri) {
 }
 
 function torrentIdOf(torrentUrl) {
-  return crypto.createHash('sha1').update(torrentUrl || '').digest('hex').slice(0, 12)
+  return crypto
+    .createHash('sha1')
+    .update(torrentUrl || '')
+    .digest('hex')
+    .slice(0, 12)
 }
 
 async function searchOneVariant(title, meta, type, config) {
@@ -55,9 +59,7 @@ async function searchOneVariant(title, meta, type, config) {
 }
 
 export async function searchJackett(titleVariants, meta, type, config) {
-  const results = await Promise.all(
-    titleVariants.map(t => searchOneVariant(t, meta, type, config))
-  )
+  const results = await Promise.all(titleVariants.map(t => searchOneVariant(t, meta, type, config)))
   const flat = results.flat()
 
   const byKey = new Map()

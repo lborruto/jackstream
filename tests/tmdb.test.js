@@ -3,7 +3,11 @@ import { resolveImdbId, parseStremioId, clearCache } from '../src/tmdb.js'
 
 describe('parseStremioId', () => {
   test('movie id', () => {
-    expect(parseStremioId('tt0111161')).toEqual({ imdbId: 'tt0111161', season: null, episode: null })
+    expect(parseStremioId('tt0111161')).toEqual({
+      imdbId: 'tt0111161',
+      season: null,
+      episode: null,
+    })
   })
   test('series episode id', () => {
     expect(parseStremioId('tt0903747:1:3')).toEqual({
@@ -73,7 +77,12 @@ describe('resolveImdbId — series episode', () => {
           json: async () => ({
             movie_results: [],
             tv_results: [
-              { id: 1396, name: 'Breaking Bad', original_name: 'Breaking Bad', first_air_date: '2008-01-20' },
+              {
+                id: 1396,
+                name: 'Breaking Bad',
+                original_name: 'Breaking Bad',
+                first_air_date: '2008-01-20',
+              },
             ],
           }),
         }

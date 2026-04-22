@@ -2,7 +2,7 @@ const QUALITY_SCORE = { '4K': 4, '1080p': 3, '720p': 2, '480p': 1, CAM: -1 }
 const SOURCE_SCORE = { Remux: 5, BluRay: 4, 'WEB-DL': 3, WEBRip: 2, HDTV: 1, CAM: -1 }
 const HDR_SCORE = { DV: 3, HDR10: 2, HDR: 1 }
 
-const score = (map, key, fallback = 0) => (key == null ? fallback : map[key] ?? fallback)
+const score = (map, key, fallback = 0) => (key == null ? fallback : (map[key] ?? fallback))
 
 function keyOf(torrent) {
   const p = torrent.parsedTitle || {}

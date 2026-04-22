@@ -34,9 +34,7 @@ function getClient() {
 }
 
 function pickVideoFile(torrent) {
-  const videos = torrent.files.filter(f =>
-    VIDEO_EXTS.includes(path.extname(f.name).toLowerCase())
-  )
+  const videos = torrent.files.filter(f => VIDEO_EXTS.includes(path.extname(f.name).toLowerCase()))
   const pool = videos.length ? videos : torrent.files
   return pool.slice().sort((a, b) => b.length - a.length)[0]
 }
@@ -180,7 +178,13 @@ export async function streamFile(torrentId, _fileIdx, req, res) {
     ? Math.min(parseInt(endPart, 10), total - 1)
     : Math.min(start + CHUNK_MAX, total - 1)
 
-  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start < 0 || end >= total) {
+  if (
+    !Number.isFinite(start) ||
+    !Number.isFinite(end) ||
+    start > end ||
+    start < 0 ||
+    end >= total
+  ) {
     res.setHeader('Content-Range', `bytes */${total}`)
     return res.status(416).json({ error: 'bad_range' })
   }

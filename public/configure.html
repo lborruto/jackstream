@@ -15,10 +15,13 @@
         --danger: #e06c75;
         --ok: #8ec07c;
       }
-      * { box-sizing: border-box; }
+      * {
+        box-sizing: border-box;
+      }
       body {
         margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         background: var(--bg);
         color: var(--text);
         min-height: 100vh;
@@ -35,10 +38,23 @@
         width: 100%;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
       }
-      h1 { margin: 0 0 0.25rem; font-size: 1.6rem; }
-      p.lead { color: var(--muted); margin: 0 0 1.5rem; }
-      label { display: block; margin-top: 1rem; font-size: 0.9rem; color: var(--muted); }
-      input[type='text'], input[type='url'], input[type='number'] {
+      h1 {
+        margin: 0 0 0.25rem;
+        font-size: 1.6rem;
+      }
+      p.lead {
+        color: var(--muted);
+        margin: 0 0 1.5rem;
+      }
+      label {
+        display: block;
+        margin-top: 1rem;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      input[type='text'],
+      input[type='url'],
+      input[type='number'] {
         width: 100%;
         margin-top: 0.35rem;
         padding: 0.6rem 0.75rem;
@@ -48,10 +64,26 @@
         color: var(--text);
         font-size: 1rem;
       }
-      input:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
-      .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; }
-      @media (max-width: 600px) { .row { grid-template-columns: 1fr; } }
-      .actions { margin-top: 1.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+      input:focus {
+        outline: 2px solid var(--accent);
+        border-color: var(--accent);
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 0.75rem;
+      }
+      @media (max-width: 600px) {
+        .row {
+          grid-template-columns: 1fr;
+        }
+      }
+      .actions {
+        margin-top: 1.5rem;
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
       button {
         padding: 0.6rem 1rem;
         border: 0;
@@ -61,12 +93,27 @@
         background: #3a3a5c;
         color: var(--text);
       }
-      button.primary { background: var(--accent); }
-      button.primary:hover { background: var(--accent-hover); }
-      button:disabled { opacity: 0.6; cursor: not-allowed; }
-      .result { margin-top: 0.5rem; font-size: 0.85rem; min-height: 1.2em; }
-      .result.ok { color: var(--ok); }
-      .result.err { color: var(--danger); }
+      button.primary {
+        background: var(--accent);
+      }
+      button.primary:hover {
+        background: var(--accent-hover);
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .result {
+        margin-top: 0.5rem;
+        font-size: 0.85rem;
+        min-height: 1.2em;
+      }
+      .result.ok {
+        color: var(--ok);
+      }
+      .result.err {
+        color: var(--danger);
+      }
       .url-box {
         margin-top: 1rem;
         word-break: break-all;
@@ -77,20 +124,31 @@
         font-size: 0.8rem;
         color: var(--muted);
       }
-      .footer { margin-top: 1.5rem; font-size: 0.8rem; color: var(--muted); }
-      a { color: var(--accent-hover); }
+      .footer {
+        margin-top: 1.5rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      a {
+        color: var(--accent-hover);
+      }
     </style>
   </head>
   <body>
     <main class="card">
       <h1>jackstream</h1>
-      <p class="lead">Configure your Jackett + TMDB credentials. They are encoded into the addon URL and never stored on this server.</p>
+      <p class="lead">
+        Configure your Jackett + TMDB credentials. They are encoded into the addon URL and never
+        stored on this server.
+      </p>
 
       <form id="f" autocomplete="off">
-        <label>Jackett URL
+        <label
+          >Jackett URL
           <input type="url" name="jackettUrl" placeholder="http://192.168.1.10:9117" required />
         </label>
-        <label>Jackett API key
+        <label
+          >Jackett API key
           <input type="text" name="jackettApiKey" required />
         </label>
         <div class="actions">
@@ -98,7 +156,8 @@
           <span class="result" id="resJackett"></span>
         </div>
 
-        <label>TMDB API key
+        <label
+          >TMDB API key
           <input type="text" name="tmdbApiKey" required />
         </label>
         <div class="actions">
@@ -106,18 +165,27 @@
           <span class="result" id="resTmdb"></span>
         </div>
 
-        <label>Addon public URL
-          <input type="url" name="addonPublicUrl" placeholder="https://addon.example.com" required />
+        <label
+          >Addon public URL
+          <input
+            type="url"
+            name="addonPublicUrl"
+            placeholder="https://addon.example.com"
+            required
+          />
         </label>
 
         <div class="row">
-          <label>Max results
+          <label
+            >Max results
             <input type="number" name="maxResults" value="10" min="1" max="50" />
           </label>
-          <label>Min seeders
+          <label
+            >Min seeders
             <input type="number" name="minSeeders" value="1" min="0" max="9999" />
           </label>
-          <label>Max concurrent torrents
+          <label
+            >Max concurrent torrents
             <input type="number" name="maxConcurrentTorrents" value="3" min="1" max="10" />
           </label>
         </div>

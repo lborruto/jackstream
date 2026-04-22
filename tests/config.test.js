@@ -34,16 +34,14 @@ describe('validateConfig', () => {
     expect(() => validateConfig(sample)).not.toThrow()
   })
 
-  test.each([
-    'jackettUrl',
-    'jackettApiKey',
-    'tmdbApiKey',
-    'addonPublicUrl',
-  ])('throws when %s is missing', field => {
-    const copy = { ...sample }
-    delete copy[field]
-    expect(() => validateConfig(copy)).toThrow(field)
-  })
+  test.each(['jackettUrl', 'jackettApiKey', 'tmdbApiKey', 'addonPublicUrl'])(
+    'throws when %s is missing',
+    field => {
+      const copy = { ...sample }
+      delete copy[field]
+      expect(() => validateConfig(copy)).toThrow(field)
+    }
+  )
 
   test('throws when jackettUrl is not a valid URL', () => {
     expect(() => validateConfig({ ...sample, jackettUrl: 'not a url' })).toThrow()
