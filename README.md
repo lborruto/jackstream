@@ -10,16 +10,16 @@ Self-hosted Stremio addon — query your Jackett and stream torrents instantly v
 
 ## Quick start (homelab on LAN)
 
-1. On your homelab/server, with Docker installed:
+1. On your homelab/server:
    ```bash
    docker compose up -d
    ```
 2. From any device on the same LAN, open `http://<server-ip>:7000/configure`.
-3. Fill in your Jackett URL + API key, your TMDB API key, and set **Addon public URL** to `http://<server-ip>:7000` (the same URL you're looking at, with your server's LAN IP).
+3. Fill in your Jackett URL + API key, your TMDB API key. For **Addon public URL** just enter your server's LAN IP (e.g. `192.168.0.15`) — the page auto-converts it to an HTTPS URL (`https://192-168-0-15.local-ip.medicmobile.org:7001`) so Stremio clients on other devices can reach it with a valid TLS cert.
 4. Click *Install in Stremio* — the native Stremio app opens and installs the addon.
-5. Pick a movie or episode in Stremio — Jackett torrents appear as sources, one click plays.
+5. Pick a movie or episode — Jackett torrents appear as sources.
 
-No HTTPS, no reverse proxy, no cert trust — native Stremio apps (desktop, Android, Android TV, iOS, Apple TV) accept plain HTTP on the LAN. HTTPS is only needed if you want the addon to work in the web client at `web.stremio.com` ([see below](#https-only-needed-for-webstremiocom)).
+No domain, no cert management, no per-device trust setup. HTTPS uses a wildcard cert from `local-ip.medicmobile.org` (see [HTTPS details](#https-details) for how it works and its tradeoffs).
 
 ## Architecture
 
@@ -102,34 +102,41 @@ npm start
 4. Click *Install in Stremio* — the page launches `stremio://...` with your base64url-encoded config.
 5. The generated HTTP URL is shown for manual install on other devices.
 
-## HTTPS (only needed for web.stremio.com)
+## HTTPS details
 
-Native Stremio apps (desktop, Android, Android TV, iOS, Apple TV) accept plain HTTP addons on the LAN. You only need HTTPS if you want the addon to work in the web client at `https://web.stremio.com`, which refuses mixed HTTP/HTTPS content.
+jackstream ships a pre-baked TLS cert + key from <https://local-ip.medicmobile.org> — a community service that issues a public `*.local-ip.medicmobile.org` Let's Encrypt certificate and operates a DNS server where `<dashed-ip>.local-ip.medicmobile.org` resolves to `<ip>`. This gives you valid HTTPS for any LAN IP with zero setup.
 
-If you do need HTTPS, put a reverse proxy in front.
+The HTTPS listener binds on port **7001** alongside the HTTP listener on **7000**. Stremio clients hit the HTTPS URL; the TCP connection still goes directly to your LAN host.
 
-### Caddy (one line)
+### Tradeoffs
 
+- The TLS private key is public (by design — same key in every copy of this image). Anyone who can also control DNS on your network could MITM; on a trusted home LAN this is a non-issue. Not suitable for addons exposed to the public internet.
+- The service is community-run (Medic Mobile). If it goes offline, bundled certs will eventually expire and you'll need to swap them. Run `./scripts/refresh-certs.sh` before building a new image to pull fresh certs.
+
+### Using your own cert instead
+
+Mount a cert + key and point the addon at them:
+
+```yaml
+services:
+  jackstream:
+    image: ghcr.io/OWNER/jackstream:latest
+    ports:
+      - "7000:7000"
+      - "7001:7001"
+    environment:
+      - HTTPS_CERT_PATH=/certs/fullchain.pem
+      - HTTPS_KEY_PATH=/certs/privkey.pem
+    volumes:
+      - /path/to/your/certs:/certs:ro
+    restart: unless-stopped
 ```
-addon.example.com {
-    reverse_proxy 127.0.0.1:7000
-}
-```
 
-### Nginx
+Works with Caddy-issued certs, mkcert, Let's Encrypt, or anything else.
 
-```nginx
-server {
-    listen 443 ssl;
-    server_name addon.example.com;
-    # … ssl_certificate, ssl_certificate_key …
-    location / {
-        proxy_pass http://127.0.0.1:7000;
-        proxy_set_header Host $host;
-        proxy_http_version 1.1;
-    }
-}
-```
+### Disabling HTTPS
+
+Set `HTTPS_DISABLED=1` to skip starting the HTTPS listener (HTTP-only). Useful if you front the addon with Caddy/Nginx that already terminates TLS.
 
 ## FAQ
 
@@ -161,6 +168,10 @@ Both work. `notWebReady: true` tells Stremio to use the native player rather tha
 | `STREAM_READY_MB` | `5` | MB to buffer before streaming |
 | `STREAM_READY_TIMEOUT_S` | `60` | Max wait for first pieces |
 | `TORRENT_IDLE_TIMEOUT_MIN` | `30` | Idle minutes before stopping a torrent |
+| `HTTPS_PORT` | `7001` | Port for the HTTPS listener |
+| `HTTPS_CERT_PATH` | `./certs/fullchain.pem` | Path to TLS certificate (PEM) |
+| `HTTPS_KEY_PATH` | `./certs/key.pem` | Path to TLS private key (PEM) |
+| `HTTPS_DISABLED` | _(unset)_ | Set to `1` to disable the HTTPS listener |
 
 ## Contributing
 

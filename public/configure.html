@@ -166,14 +166,18 @@
         </div>
 
         <label
-          >Addon public URL
+          >Addon public URL (or LAN IP)
           <input
-            type="url"
+            type="text"
             name="addonPublicUrl"
-            placeholder="https://addon.example.com"
+            placeholder="192.168.0.15 or https://addon.example.com"
             required
           />
         </label>
+        <div style="font-size: 0.8rem; color: var(--muted); margin-top: 0.35rem">
+          LAN IPs are auto-converted to an HTTPS URL via <code>local-ip.medicmobile.org</code>
+          so Stremio clients on other devices can connect without cert warnings.
+        </div>
 
         <div class="row">
           <label
@@ -211,12 +215,39 @@
           .replace(/=+$/, '')
       }
 
+      function normalizeAddonUrl(input) {
+        if (!input) return null
+        const trimmed = String(input).trim().replace(/\/+$/, '')
+        let u
+        try {
+          u = new URL(trimmed.includes('://') ? trimmed : `http://${trimmed}`)
+        } catch {
+          return null
+        }
+        const host = u.hostname
+        const port = u.port
+        if (host === '127.0.0.1' || host === 'localhost') {
+          return `http://${host}:${port || '7000'}`
+        }
+        if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+          const dashed = host.replace(/\./g, '-')
+          return `https://${dashed}.local-ip.medicmobile.org:7001`
+        }
+        // Hostname path: use the URL as typed (preserve scheme + port if given).
+        if (!trimmed.includes('://')) return `https://${trimmed}`
+        return u.origin
+      }
+
       function formToConfig() {
         const f = document.getElementById('f')
         const data = Object.fromEntries(new FormData(f))
         ;['maxResults', 'minSeeders', 'maxConcurrentTorrents'].forEach(k => {
           if (data[k] !== '' && data[k] != null) data[k] = Number(data[k])
         })
+        if (data.addonPublicUrl) {
+          const normalized = normalizeAddonUrl(data.addonPublicUrl)
+          if (normalized) data.addonPublicUrl = normalized
+        }
         return data
       }
 

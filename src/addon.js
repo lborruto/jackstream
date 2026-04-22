@@ -1,6 +1,8 @@
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import fs from 'node:fs'
+import https from 'node:https'
 import express from 'express'
 import cors from 'cors'
 
@@ -15,6 +17,11 @@ const require = createRequire(import.meta.url)
 const { addonBuilder } = require('stremio-addon-sdk')
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const HTTPS_PORT = parseInt(process.env.HTTPS_PORT || '7001', 10)
+const HTTPS_CERT_PATH =
+  process.env.HTTPS_CERT_PATH || path.join(__dirname, '..', 'certs', 'fullchain.pem')
+const HTTPS_KEY_PATH = process.env.HTTPS_KEY_PATH || path.join(__dirname, '..', 'certs', 'key.pem')
+const HTTPS_DISABLED = process.env.HTTPS_DISABLED === '1' || process.env.HTTPS_DISABLED === 'true'
 const PORT = parseInt(process.env.PORT || '7000', 10)
 
 let lastMaxConcurrent = parseInt(process.env.MAX_CONCURRENT_TORRENTS || '3', 10)
@@ -212,12 +219,31 @@ setInterval(() => {
   }
 }, 60 * 1000).unref()
 
+function tryStartHttps(app) {
+  if (HTTPS_DISABLED) {
+    console.log('[https] disabled via HTTPS_DISABLED')
+    return null
+  }
+  try {
+    const cert = fs.readFileSync(HTTPS_CERT_PATH)
+    const key = fs.readFileSync(HTTPS_KEY_PATH)
+    const server = https.createServer({ cert, key }, app).listen(HTTPS_PORT, () => {
+      console.log(`jackstream https listening on :${HTTPS_PORT}`)
+    })
+    return server
+  } catch (err) {
+    console.warn(`[https] disabled (${err.message}); HTTP only on :${PORT}`)
+    return null
+  }
+}
+
 const isMain = fileURLToPath(import.meta.url) === process.argv[1]
 if (isMain) {
   const app = buildApp()
   app.listen(PORT, () => {
     console.log(`jackstream listening on :${PORT}`)
   })
+  tryStartHttps(app)
   for (const sig of ['SIGINT', 'SIGTERM']) {
     process.once(sig, () => {
       console.log(`received ${sig}, shutting down`)

@@ -1,7 +1,11 @@
 services:
   jackstream:
-    image: jackstream:latest
+    image: ghcr.io/OWNER/jackstream:latest
+    # Or build from source instead of pulling: comment out `image:` above and
+    # uncomment the next line.
+    # build: .
     container_name: jackstream
     ports:
       - "7000:7000"
+      - "7001:7001"
     restart: unless-stopped
