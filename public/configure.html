@@ -133,6 +133,39 @@
       a {
         color: var(--accent-hover);
       }
+      details.advanced {
+        margin-top: 1.5rem;
+        border-top: 1px solid #3a3a5c;
+        padding-top: 1rem;
+      }
+      details.advanced > summary {
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 0.9rem;
+        user-select: none;
+        padding: 0.25rem 0;
+      }
+      details.advanced > summary:hover {
+        color: var(--text);
+      }
+      details.advanced[open] > summary {
+        color: var(--text);
+        margin-bottom: 0.5rem;
+      }
+      details.advanced select {
+        width: 100%;
+        margin-top: 0.35rem;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid #3a3a5c;
+        border-radius: 6px;
+        background: #16162a;
+        color: var(--text);
+        font-size: 1rem;
+      }
+      details.advanced select:focus {
+        outline: 2px solid var(--accent);
+        border-color: var(--accent);
+      }
     </style>
   </head>
   <body>
@@ -195,6 +228,62 @@
           </label>
         </div>
 
+        <details class="advanced">
+          <summary>Advanced filters</summary>
+
+          <label
+            >Preferred audio language
+            <select name="preferredLanguage">
+              <option value="">Any (no preference)</option>
+              <option value="FRENCH">French (boosts FRENCH and MULTI)</option>
+              <option value="MULTI">MULTI only</option>
+              <option value="VOSTFR">VOSTFR</option>
+              <option value="ENG">English (boosts ENG and MULTI)</option>
+            </select>
+          </label>
+
+          <div class="row">
+            <label
+              >Min quality
+              <select name="minQuality">
+                <option value="">No minimum</option>
+                <option value="480p">480p</option>
+                <option value="720p">720p</option>
+                <option value="1080p">1080p</option>
+              </select>
+            </label>
+            <label
+              >Max quality
+              <select name="maxQuality">
+                <option value="">No maximum</option>
+                <option value="720p">720p</option>
+                <option value="1080p">1080p</option>
+                <option value="4K">4K</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="row">
+            <label
+              >Min size (MB)
+              <input type="number" name="minSizeMb" min="0" step="50" placeholder="e.g. 500" />
+            </label>
+            <label
+              >Max size (GB)
+              <input type="number" name="maxSizeGb" min="0" step="0.5" placeholder="e.g. 20" />
+            </label>
+          </div>
+
+          <label
+            >Blacklist keywords (comma-separated)
+            <input
+              type="text"
+              name="blacklistKeywords"
+              placeholder="e.g. CAM, HDCAM, TELESYNC"
+            />
+          </label>
+        </details>
+
         <div class="actions">
           <button type="submit" class="primary">Install in Stremio</button>
           <button type="button" id="copy">Copy URL</button>
@@ -204,7 +293,9 @@
       </form>
 
       <div class="footer">
-        HTTPS is required outside <code>127.0.0.1</code>. See the README for reverse-proxy examples.
+        HTTPS is handled automatically via <code>local-ip.medicmobile.org</code> for LAN IPs —
+        see the README.<br />
+        <a href="#" id="clearSaved">Clear saved config on this browser</a>
       </div>
     </main>
 
@@ -242,14 +333,86 @@
       function formToConfig() {
         const f = document.getElementById('f')
         const data = Object.fromEntries(new FormData(f))
-        ;['maxResults', 'minSeeders', 'maxConcurrentTorrents'].forEach(k => {
-          if (data[k] !== '' && data[k] != null) data[k] = Number(data[k])
+        // Numeric coercions
+        ;['maxResults', 'minSeeders', 'maxConcurrentTorrents', 'minSizeMb', 'maxSizeGb'].forEach(
+          k => {
+            if (data[k] !== '' && data[k] != null) data[k] = Number(data[k])
+            else delete data[k]
+          }
+        )
+        // Empty selects → delete so server default kicks in
+        ;['preferredLanguage', 'minQuality', 'maxQuality'].forEach(k => {
+          if (!data[k]) delete data[k]
         })
+        // Parse blacklist keywords
+        if (typeof data.blacklistKeywords === 'string') {
+          const list = data.blacklistKeywords
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean)
+          if (list.length) data.blacklistKeywords = list
+          else delete data.blacklistKeywords
+        }
+        // Normalize addonPublicUrl for LAN IP → local-ip.medicmobile.org HTTPS
         if (data.addonPublicUrl) {
-          const normalized = normalizeAddonUrl(data.addonPublicUrl)
-          if (normalized) data.addonPublicUrl = normalized
+          data.addonPublicUrl = normalizeAddonUrl(data.addonPublicUrl) || data.addonPublicUrl
         }
         return data
+      }
+
+      const LS_KEY = 'jackstream.config.v1'
+
+      function loadSaved() {
+        try {
+          const raw = localStorage.getItem(LS_KEY)
+          return raw ? JSON.parse(raw) : null
+        } catch {
+          return null
+        }
+      }
+
+      function saveCurrent(cfg) {
+        try {
+          localStorage.setItem(LS_KEY, JSON.stringify(cfg))
+        } catch {
+          // quota or disabled storage — silently ignore
+        }
+      }
+
+      function clearSaved() {
+        try {
+          localStorage.removeItem(LS_KEY)
+        } catch {
+          // ignore
+        }
+      }
+
+      function prefillFormFromConfig(cfg) {
+        if (!cfg || typeof cfg !== 'object') return
+        const f = document.getElementById('f')
+        Object.entries(cfg).forEach(([k, v]) => {
+          const el = f.elements[k]
+          if (!el) return
+          if (Array.isArray(v)) {
+            el.value = v.join(', ')
+          } else if (v == null) {
+            el.value = ''
+          } else {
+            el.value = String(v)
+          }
+        })
+      }
+
+      function fromB64Url(str) {
+        if (!str) return null
+        const pad = '='.repeat((4 - (str.length % 4)) % 4)
+        const normalized = str.replace(/-/g, '+').replace(/_/g, '/') + pad
+        try {
+          const json = decodeURIComponent(escape(atob(normalized)))
+          return JSON.parse(json)
+        } catch {
+          return null
+        }
       }
 
       function buildUrls() {
@@ -270,7 +433,16 @@
         box.textContent = urls ? urls.httpUrl : 'Fill the form to generate your addon URL.'
       }
 
-      document.getElementById('f').addEventListener('input', refreshUrl)
+      document.getElementById('f').addEventListener('input', () => {
+        refreshUrl()
+        // Save current form state (even if incomplete) for next visit
+        try {
+          const data = Object.fromEntries(new FormData(document.getElementById('f')))
+          saveCurrent(data)
+        } catch {
+          // ignore
+        }
+      })
 
       document.getElementById('f').addEventListener('submit', e => {
         e.preventDefault()
@@ -351,6 +523,31 @@
         const url = `/api/test-tmdb?key=${encodeURIComponent(cfg.tmdbApiKey || '')}`
         testCall(url, document.getElementById('testTmdb'), document.getElementById('resTmdb'))
       })
+
+      document.getElementById('clearSaved').addEventListener('click', e => {
+        e.preventDefault()
+        if (!confirm('Clear saved form values on this browser?')) return
+        clearSaved()
+        document.getElementById('f').reset()
+        refreshUrl()
+      })
+
+      ;(function prefill() {
+        // 1. URL-based: /<base64>/configure — take precedence if present
+        const m = window.location.pathname.match(/^\/([^/]+)\/configure\/?$/)
+        const fromUrl = m ? fromB64Url(m[1]) : null
+        if (fromUrl) {
+          prefillFormFromConfig(fromUrl)
+          refreshUrl()
+          return
+        }
+        // 2. localStorage fallback
+        const saved = loadSaved()
+        if (saved) {
+          prefillFormFromConfig(saved)
+          refreshUrl()
+        }
+      })()
     </script>
   </body>
 </html>
