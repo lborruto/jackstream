@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>jackstream · configure</title>
+    <style>
+      :root {
+        --bg: #1a1a2e;
+        --panel: #242442;
+        --accent: #7b5ea7;
+        --accent-hover: #9778c4;
+        --text: #e9e6f5;
+        --muted: #8a86a8;
+        --danger: #e06c75;
+        --ok: #8ec07c;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 2rem 1rem;
+      }
+      .card {
+        background: var(--panel);
+        border-radius: 12px;
+        padding: 2rem;
+        max-width: 560px;
+        width: 100%;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+      }
+      h1 { margin: 0 0 0.25rem; font-size: 1.6rem; }
+      p.lead { color: var(--muted); margin: 0 0 1.5rem; }
+      label { display: block; margin-top: 1rem; font-size: 0.9rem; color: var(--muted); }
+      input[type='text'], input[type='url'], input[type='number'] {
+        width: 100%;
+        margin-top: 0.35rem;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid #3a3a5c;
+        border-radius: 6px;
+        background: #16162a;
+        color: var(--text);
+        font-size: 1rem;
+      }
+      input:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+      .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; }
+      @media (max-width: 600px) { .row { grid-template-columns: 1fr; } }
+      .actions { margin-top: 1.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+      button {
+        padding: 0.6rem 1rem;
+        border: 0;
+        border-radius: 6px;
+        font-size: 0.95rem;
+        cursor: pointer;
+        background: #3a3a5c;
+        color: var(--text);
+      }
+      button.primary { background: var(--accent); }
+      button.primary:hover { background: var(--accent-hover); }
+      button:disabled { opacity: 0.6; cursor: not-allowed; }
+      .result { margin-top: 0.5rem; font-size: 0.85rem; min-height: 1.2em; }
+      .result.ok { color: var(--ok); }
+      .result.err { color: var(--danger); }
+      .url-box {
+        margin-top: 1rem;
+        word-break: break-all;
+        background: #16162a;
+        padding: 0.75rem;
+        border-radius: 6px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      .footer { margin-top: 1.5rem; font-size: 0.8rem; color: var(--muted); }
+      a { color: var(--accent-hover); }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1>jackstream</h1>
+      <p class="lead">Configure your Jackett + TMDB credentials. They are encoded into the addon URL and never stored on this server.</p>
+
+      <form id="f" autocomplete="off">
+        <label>Jackett URL
+          <input type="url" name="jackettUrl" placeholder="http://192.168.1.10:9117" required />
+        </label>
+        <label>Jackett API key
+          <input type="text" name="jackettApiKey" required />
+        </label>
+        <div class="actions">
+          <button type="button" id="testJackett">Test Jackett</button>
+          <span class="result" id="resJackett"></span>
+        </div>
+
+        <label>TMDB API key
+          <input type="text" name="tmdbApiKey" required />
+        </label>
+        <div class="actions">
+          <button type="button" id="testTmdb">Test TMDB</button>
+          <span class="result" id="resTmdb"></span>
+        </div>
+
+        <label>Addon public URL
+          <input type="url" name="addonPublicUrl" placeholder="https://addon.example.com" required />
+        </label>
+
+        <div class="row">
+          <label>Max results
+            <input type="number" name="maxResults" value="10" min="1" max="50" />
+          </label>
+          <label>Min seeders
+            <input type="number" name="minSeeders" value="1" min="0" max="9999" />
+          </label>
+          <label>Max concurrent torrents
+            <input type="number" name="maxConcurrentTorrents" value="3" min="1" max="10" />
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="primary">Install in Stremio</button>
+          <button type="button" id="copy">Copy URL</button>
+        </div>
+
+        <div class="url-box" id="urlBox">Fill the form to generate your addon URL.</div>
+      </form>
+
+      <div class="footer">
+        HTTPS is required outside <code>127.0.0.1</code>. See the README for reverse-proxy examples.
+      </div>
+    </main>
+
+    <script>
+      function toB64Url(str) {
+        return btoa(unescape(encodeURIComponent(str)))
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '')
+      }
+
+      function formToConfig() {
+        const f = document.getElementById('f')
+        const data = Object.fromEntries(new FormData(f))
+        ;['maxResults', 'minSeeders', 'maxConcurrentTorrents'].forEach(k => {
+          if (data[k] !== '' && data[k] != null) data[k] = Number(data[k])
+        })
+        return data
+      }
+
+      function buildUrls() {
+        const cfg = formToConfig()
+        if (!cfg.jackettUrl || !cfg.jackettApiKey || !cfg.tmdbApiKey || !cfg.addonPublicUrl) {
+          return null
+        }
+        const b64 = toB64Url(JSON.stringify(cfg))
+        const base = cfg.addonPublicUrl.replace(/\/$/, '')
+        const httpUrl = `${base}/${b64}/manifest.json`
+        const stremioUrl = httpUrl.replace(/^https?:\/\//, 'stremio://')
+        return { httpUrl, stremioUrl }
+      }
+
+      function refreshUrl() {
+        const urls = buildUrls()
+        const box = document.getElementById('urlBox')
+        box.textContent = urls ? urls.httpUrl : 'Fill the form to generate your addon URL.'
+      }
+
+      document.getElementById('f').addEventListener('input', refreshUrl)
+
+      document.getElementById('f').addEventListener('submit', e => {
+        e.preventDefault()
+        const urls = buildUrls()
+        if (urls) window.location.href = urls.stremioUrl
+      })
+
+      document.getElementById('copy').addEventListener('click', async () => {
+        const urls = buildUrls()
+        if (!urls) return
+        try {
+          await navigator.clipboard.writeText(urls.httpUrl)
+          const box = document.getElementById('urlBox')
+          const old = box.textContent
+          box.textContent = 'Copied!'
+          setTimeout(() => (box.textContent = old), 1200)
+        } catch {
+          // ignore
+        }
+      })
+
+      async function testCall(path, btn, out) {
+        btn.disabled = true
+        out.className = 'result'
+        out.textContent = 'Testing…'
+        try {
+          const res = await fetch(path)
+          const data = await res.json()
+          if (data.ok) {
+            out.className = 'result ok'
+            out.textContent = 'OK'
+          } else {
+            out.className = 'result err'
+            out.textContent = data.error || 'failed'
+          }
+        } catch (err) {
+          out.className = 'result err'
+          out.textContent = err.message
+        } finally {
+          btn.disabled = false
+        }
+      }
+
+      document.getElementById('testJackett').addEventListener('click', () => {
+        const cfg = formToConfig()
+        const url = `/api/test-jackett?url=${encodeURIComponent(cfg.jackettUrl || '')}&key=${encodeURIComponent(cfg.jackettApiKey || '')}`
+        testCall(url, document.getElementById('testJackett'), document.getElementById('resJackett'))
+      })
+
+      document.getElementById('testTmdb').addEventListener('click', () => {
+        const cfg = formToConfig()
+        const url = `/api/test-tmdb?key=${encodeURIComponent(cfg.tmdbApiKey || '')}`
+        testCall(url, document.getElementById('testTmdb'), document.getElementById('resTmdb'))
+      })
+    </script>
+  </body>
+</html>
