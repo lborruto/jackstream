@@ -215,6 +215,13 @@ Most often because the container restarted (e.g. Komodo redeploy) and the in-mem
 
 ## Changelog
 
+### v1.1.1 — Disk cleanup (2026-04-23)
+
+- 🗑️ **Fix:** `bt.Cleanup()` and `Shutdown()` now delete downloaded pieces from disk, not just from memory. Previously the container's writable layer (`/tmp/jackstream`) grew unboundedly until `docker rm`. Long-running containers now reclaim disk as torrents go idle or at shutdown.
+- Internal: `dropAndDelete()` helper replaces direct `torrent.Drop()` calls; `Shutdown()` additionally wipes the `DataDir` to catch orphan files from fetch-fail paths.
+
+No user-facing behavior change. Existing installs continue to work; upgrade at any time.
+
 ### v1.1.0 — Go rewrite (2026-04-23)
 
 Full rewrite from Node.js to Go with strict behavioral parity. Same URLs, same config format, same UX, but:
