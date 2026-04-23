@@ -1,9 +1,16 @@
-FROM golang:1.23-alpine AS build
+FROM golang:1.24-alpine AS build
+ENV GOTOOLCHAIN=local
+RUN apk add --no-cache ca-certificates
 WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
 COPY . .
-RUN go build -o /jackstream ./cmd/jackstream
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -trimpath -ldflags "-s -w" \
+    -o /jackstream ./cmd/jackstream
 
-FROM alpine:3
+FROM scratch
 COPY --from=build /jackstream /jackstream
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 EXPOSE 7000 7001
 ENTRYPOINT ["/jackstream"]
