@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>jackstream · configure</title>
+    <style>
+      :root {
+        --bg: #1a1a2e;
+        --panel: #242442;
+        --accent: #7b5ea7;
+        --accent-hover: #9778c4;
+        --text: #e9e6f5;
+        --muted: #8a86a8;
+        --danger: #e06c75;
+        --ok: #8ec07c;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 2rem 1rem;
+      }
+      .card {
+        background: var(--panel);
+        border-radius: 12px;
+        padding: 2rem;
+        max-width: 560px;
+        width: 100%;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+      }
+      h1 {
+        margin: 0 0 0.25rem;
+        font-size: 1.6rem;
+      }
+      p.lead {
+        color: var(--muted);
+        margin: 0 0 1.5rem;
+      }
+      label {
+        display: block;
+        margin-top: 1rem;
+        font-size: 0.9rem;
+        color: var(--muted);
+      }
+      input[type='text'],
+      input[type='url'],
+      input[type='number'],
+      input[type='password'] {
+        width: 100%;
+        margin-top: 0.35rem;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid #3a3a5c;
+        border-radius: 6px;
+        background: #16162a;
+        color: var(--text);
+        font-size: 1rem;
+      }
+      input:focus {
+        outline: 2px solid var(--accent);
+        border-color: var(--accent);
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 0.75rem;
+      }
+      @media (max-width: 600px) {
+        .row {
+          grid-template-columns: 1fr;
+        }
+      }
+      .actions {
+        margin-top: 1.5rem;
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      button {
+        padding: 0.6rem 1rem;
+        border: 0;
+        border-radius: 6px;
+        font-size: 0.95rem;
+        cursor: pointer;
+        background: #3a3a5c;
+        color: var(--text);
+      }
+      button.primary {
+        background: var(--accent);
+      }
+      button.primary:hover {
+        background: var(--accent-hover);
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .result {
+        margin-top: 0.5rem;
+        font-size: 0.85rem;
+        min-height: 1.2em;
+      }
+      .result.ok {
+        color: var(--ok);
+      }
+      .result.err {
+        color: var(--danger);
+      }
+      .url-box {
+        margin-top: 1rem;
+        word-break: break-all;
+        background: #16162a;
+        padding: 0.75rem;
+        border-radius: 6px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      .footer {
+        margin-top: 1.5rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      a {
+        color: var(--accent-hover);
+      }
+      details.advanced {
+        margin-top: 1.5rem;
+        border-top: 1px solid #3a3a5c;
+        padding-top: 1rem;
+      }
+      details.advanced > summary {
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 0.9rem;
+        user-select: none;
+        padding: 0.25rem 0;
+      }
+      details.advanced > summary:hover {
+        color: var(--text);
+      }
+      details.advanced[open] > summary {
+        color: var(--text);
+        margin-bottom: 0.5rem;
+      }
+      details.advanced select {
+        width: 100%;
+        margin-top: 0.35rem;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid #3a3a5c;
+        border-radius: 6px;
+        background: #16162a;
+        color: var(--text);
+        font-size: 1rem;
+      }
+      details.advanced select:focus {
+        outline: 2px solid var(--accent);
+        border-color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1>jackstream</h1>
+      <p class="lead">
+        Configure your Jackett + TMDB credentials. They are encoded into the addon URL and never
+        stored on this server.
+      </p>
+
+      <form id="f" autocomplete="off">
+        <label
+          >Jackett URL
+          <input type="url" name="jackettUrl" placeholder="http://192.168.1.10:9117" required />
+        </label>
+        <label
+          >Jackett API key
+          <input type="password" name="jackettApiKey" required autocomplete="new-password" />
+        </label>
+        <div class="actions">
+          <button type="button" id="testJackett">Test Jackett</button>
+          <span class="result" id="resJackett"></span>
+        </div>
+
+        <label
+          >TMDB API key
+          <input type="password" name="tmdbApiKey" required autocomplete="new-password" />
+        </label>
+        <div class="actions">
+          <button type="button" id="testTmdb">Test TMDB</button>
+          <span class="result" id="resTmdb"></span>
+        </div>
+
+        <label
+          >Addon public URL (or LAN IP)
+          <input
+            type="text"
+            name="addonPublicUrl"
+            placeholder="192.168.0.15 or https://addon.example.com"
+            required
+          />
+        </label>
+        <div style="font-size: 0.8rem; color: var(--muted); margin-top: 0.35rem">
+          LAN IPs are auto-converted to an HTTPS URL via <code>local-ip.medicmobile.org</code>
+          so Stremio clients on other devices can connect without cert warnings.
+        </div>
+
+        <div class="row">
+          <label
+            >Max results
+            <input type="number" name="maxResults" value="10" min="1" max="50" />
+          </label>
+          <label
+            >Min seeders
+            <input type="number" name="minSeeders" value="1" min="0" max="9999" />
+          </label>
+          <label
+            >Max concurrent torrents
+            <input type="number" name="maxConcurrentTorrents" value="3" min="1" max="10" />
+          </label>
+        </div>
+
+        <details class="advanced">
+          <summary>Advanced filters</summary>
+
+          <label
+            >Preferred audio language
+            <select name="preferredLanguage">
+              <option value="">Any (no preference)</option>
+              <option value="FRENCH">French (boosts FRENCH and MULTI)</option>
+              <option value="MULTI">MULTI only</option>
+              <option value="VOSTFR">VOSTFR</option>
+              <option value="ENG">English (boosts ENG and MULTI)</option>
+            </select>
+          </label>
+
+          <div class="row">
+            <label
+              >Min quality
+              <select name="minQuality">
+                <option value="">No minimum</option>
+                <option value="480p">480p</option>
+                <option value="720p">720p</option>
+                <option value="1080p">1080p</option>
+              </select>
+            </label>
+            <label
+              >Max quality
+              <select name="maxQuality">
+                <option value="">No maximum</option>
+                <option value="720p">720p</option>
+                <option value="1080p">1080p</option>
+                <option value="4K">4K</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="row">
+            <label
+              >Min size (MB)
+              <input type="number" name="minSizeMb" min="0" step="50" placeholder="e.g. 500" />
+            </label>
+            <label
+              >Max size (GB)
+              <input type="number" name="maxSizeGb" min="0" step="0.5" placeholder="e.g. 20" />
+            </label>
+          </div>
+
+          <label
+            >Blacklist keywords (comma-separated)
+            <input
+              type="text"
+              name="blacklistKeywords"
+              placeholder="e.g. CAM, HDCAM, TELESYNC"
+            />
+          </label>
+        </details>
+
+        <div class="actions">
+          <button type="submit" class="primary">Install in Stremio</button>
+          <button type="button" id="copy">Copy URL</button>
+        </div>
+
+        <div class="url-box" id="urlBox">Fill the form to generate your addon URL.</div>
+        <div style="font-size: 0.75rem; color: var(--muted); margin-top: 0.35rem">
+          If *Install in Stremio* doesn't work (some clients mishandle the port),
+          copy the URL above and paste it into Stremio's <em>Add-on Repository URL</em> field.
+        </div>
+      </form>
+
+      <div class="footer">
+        HTTPS is handled automatically via <code>local-ip.medicmobile.org</code> for LAN IPs —
+        see the README.<br />
+        <a href="#" id="clearSaved">Clear saved config on this browser</a>
+      </div>
+    </main>
+
+    <script>
+      function toB64Url(str) {
+        return btoa(unescape(encodeURIComponent(str)))
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '')
+      }
+
+      function normalizeAddonUrl(input) {
+        if (!input) return null
+        const trimmed = String(input).trim().replace(/\/+$/, '')
+        let u
+        try {
+          u = new URL(trimmed.includes('://') ? trimmed : `http://${trimmed}`)
+        } catch {
+          return null
+        }
+        const host = u.hostname
+        const port = u.port
+        if (host === '127.0.0.1' || host === 'localhost') {
+          return `http://${host}:${port || '7000'}`
+        }
+        if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+          const dashed = host.replace(/\./g, '-')
+          return `https://${dashed}.local-ip.medicmobile.org:7001`
+        }
+        // Hostname path: use the URL as typed (preserve scheme + port if given).
+        if (!trimmed.includes('://')) return `https://${trimmed}`
+        return u.origin
+      }
+
+      function formToConfig() {
+        const f = document.getElementById('f')
+        const data = Object.fromEntries(new FormData(f))
+        // Numeric coercions
+        ;['maxResults', 'minSeeders', 'maxConcurrentTorrents', 'minSizeMb', 'maxSizeGb'].forEach(
+          k => {
+            if (data[k] !== '' && data[k] != null) data[k] = Number(data[k])
+            else delete data[k]
+          }
+        )
+        // Empty selects → delete so server default kicks in
+        ;['preferredLanguage', 'minQuality', 'maxQuality'].forEach(k => {
+          if (!data[k]) delete data[k]
+        })
+        // Parse blacklist keywords
+        if (typeof data.blacklistKeywords === 'string') {
+          const list = data.blacklistKeywords
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean)
+          if (list.length) data.blacklistKeywords = list
+          else delete data.blacklistKeywords
+        }
+        // Normalize addonPublicUrl for LAN IP → local-ip.medicmobile.org HTTPS
+        if (data.addonPublicUrl) {
+          data.addonPublicUrl = normalizeAddonUrl(data.addonPublicUrl) || data.addonPublicUrl
+        }
+        return data
+      }
+
+      const LS_KEY = 'jackstream.config.v1'
+
+      function loadSaved() {
+        try {
+          const raw = localStorage.getItem(LS_KEY)
+          return raw ? JSON.parse(raw) : null
+        } catch {
+          return null
+        }
+      }
+
+      function saveCurrent(cfg) {
+        try {
+          localStorage.setItem(LS_KEY, JSON.stringify(cfg))
+        } catch {
+          // quota or disabled storage — silently ignore
+        }
+      }
+
+      function clearSaved() {
+        try {
+          localStorage.removeItem(LS_KEY)
+        } catch {
+          // ignore
+        }
+      }
+
+      function prefillFormFromConfig(cfg) {
+        if (!cfg || typeof cfg !== 'object') return
+        const f = document.getElementById('f')
+        Object.entries(cfg).forEach(([k, v]) => {
+          const el = f.elements[k]
+          if (!el) return
+          if (Array.isArray(v)) {
+            el.value = v.join(', ')
+          } else if (v == null) {
+            el.value = ''
+          } else {
+            el.value = String(v)
+          }
+        })
+      }
+
+      function fromB64Url(str) {
+        if (!str) return null
+        const pad = '='.repeat((4 - (str.length % 4)) % 4)
+        const normalized = str.replace(/-/g, '+').replace(/_/g, '/') + pad
+        try {
+          const json = decodeURIComponent(escape(atob(normalized)))
+          return JSON.parse(json)
+        } catch {
+          return null
+        }
+      }
+
+      function buildUrls() {
+        const cfg = formToConfig()
+        if (!cfg.jackettUrl || !cfg.jackettApiKey || !cfg.tmdbApiKey || !cfg.addonPublicUrl) {
+          return null
+        }
+        const b64 = toB64Url(JSON.stringify(cfg))
+        const base = cfg.addonPublicUrl.replace(/\/$/, '')
+        const httpUrl = `${base}/${b64}/manifest.json`
+        // Canonical Stremio deep link: replace the scheme. If your Stremio
+        // client ever drops the port, copy the HTTPS URL shown below and
+        // paste it into Stremio's "Add-on Repository URL" field instead.
+        const stremioUrl = httpUrl.replace(/^https?:\/\//, 'stremio://')
+        return { httpUrl, stremioUrl }
+      }
+
+      function refreshUrl() {
+        const urls = buildUrls()
+        const box = document.getElementById('urlBox')
+        box.textContent = urls ? urls.httpUrl : 'Fill the form to generate your addon URL.'
+      }
+
+      document.getElementById('f').addEventListener('input', () => {
+        refreshUrl()
+        // Save current form state (even if incomplete) for next visit
+        try {
+          const data = Object.fromEntries(new FormData(document.getElementById('f')))
+          saveCurrent(data)
+        } catch {
+          // ignore
+        }
+      })
+
+      document.getElementById('f').addEventListener('submit', e => {
+        e.preventDefault()
+        const urls = buildUrls()
+        if (urls) window.location.href = urls.stremioUrl
+      })
+
+      function copyText(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+          return navigator.clipboard.writeText(text)
+        }
+        return new Promise((resolve, reject) => {
+          const ta = document.createElement('textarea')
+          ta.value = text
+          ta.setAttribute('readonly', '')
+          ta.style.position = 'fixed'
+          ta.style.top = '-1000px'
+          ta.style.opacity = '0'
+          document.body.appendChild(ta)
+          ta.select()
+          try {
+            document.execCommand('copy')
+            resolve()
+          } catch (err) {
+            reject(err)
+          } finally {
+            document.body.removeChild(ta)
+          }
+        })
+      }
+
+      document.getElementById('copy').addEventListener('click', async () => {
+        const urls = buildUrls()
+        if (!urls) return
+        const box = document.getElementById('urlBox')
+        const old = box.textContent
+        try {
+          await copyText(urls.httpUrl)
+          box.textContent = 'Copied!'
+        } catch {
+          box.textContent = 'Copy failed — select the URL manually'
+        }
+        setTimeout(() => {
+          box.textContent = old
+        }, 1500)
+      })
+
+      async function testCall(path, btn, out) {
+        btn.disabled = true
+        out.className = 'result'
+        out.textContent = 'Testing…'
+        try {
+          const res = await fetch(path)
+          const data = await res.json()
+          if (data.ok) {
+            out.className = 'result ok'
+            out.textContent = 'OK'
+          } else {
+            out.className = 'result err'
+            out.textContent = data.error || 'failed'
+          }
+        } catch (err) {
+          out.className = 'result err'
+          out.textContent = err.message
+        } finally {
+          btn.disabled = false
+        }
+      }
+
+      document.getElementById('testJackett').addEventListener('click', () => {
+        const cfg = formToConfig()
+        const url = `/api/test-jackett?url=${encodeURIComponent(cfg.jackettUrl || '')}&key=${encodeURIComponent(cfg.jackettApiKey || '')}`
+        testCall(url, document.getElementById('testJackett'), document.getElementById('resJackett'))
+      })
+
+      document.getElementById('testTmdb').addEventListener('click', () => {
+        const cfg = formToConfig()
+        const url = `/api/test-tmdb?key=${encodeURIComponent(cfg.tmdbApiKey || '')}`
+        testCall(url, document.getElementById('testTmdb'), document.getElementById('resTmdb'))
+      })
+
+      document.getElementById('clearSaved').addEventListener('click', e => {
+        e.preventDefault()
+        if (!confirm('Clear saved form values on this browser?')) return
+        clearSaved()
+        document.getElementById('f').reset()
+        refreshUrl()
+      })
+
+      ;(function prefill() {
+        // 1. URL-based: /<base64>/configure — take precedence if present
+        const m = window.location.pathname.match(/^\/([^/]+)\/configure\/?$/)
+        const fromUrl = m ? fromB64Url(m[1]) : null
+        if (fromUrl) {
+          prefillFormFromConfig(fromUrl)
+          refreshUrl()
+          return
+        }
+        // 2. localStorage fallback
+        const saved = loadSaved()
+        if (saved) {
+          prefillFormFromConfig(saved)
+          refreshUrl()
+        }
+      })()
+    </script>
+  </body>
+</html>
