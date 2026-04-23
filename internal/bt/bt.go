@@ -37,9 +37,10 @@ type activeEntry struct {
 }
 
 type Client struct {
-	mu     sync.Mutex
-	client *torrent.Client
-	active map[string]*activeEntry
+	mu      sync.Mutex
+	client  *torrent.Client
+	active  map[string]*activeEntry
+	dataDir string
 }
 
 var (
@@ -78,9 +79,27 @@ func NewClient() (*Client, error) {
 		return nil, err
 	}
 	return &Client{
-		client: c,
-		active: make(map[string]*activeEntry),
+		client:  c,
+		active:  make(map[string]*activeEntry),
+		dataDir: cfg.DataDir,
 	}, nil
+}
+
+// dropAndDelete drops the torrent from the client AND removes its on-disk files.
+// Must be called with c.mu held. The active map entry for this torrentID MUST
+// still be present; the caller is responsible for removing it from c.active.
+func (c *Client) dropAndDelete(e *activeEntry) {
+	// Capture the info name BEFORE Drop — after Drop, Info() may become nil.
+	var rootPath string
+	if info := e.t.Info(); info != nil && info.Name != "" && c.dataDir != "" {
+		rootPath = filepath.Join(c.dataDir, info.Name)
+	}
+	e.t.Drop()
+	if rootPath != "" && rootPath != c.dataDir && rootPath != "/" {
+		if err := os.RemoveAll(rootPath); err != nil {
+			log.Printf("[bt] removeAll %q: %v", rootPath, err)
+		}
+	}
 }
 
 func fetchTorrentBuffer(ctx context.Context, url string) ([]byte, error) {
@@ -268,7 +287,7 @@ func (c *Client) Cleanup(maxConcurrent int) {
 	now := time.Now()
 	for id, e := range c.active {
 		if e.readers == 0 && now.Sub(e.lastAccess) > idleTimeout() {
-			e.t.Drop()
+			c.dropAndDelete(e)
 			delete(c.active, id)
 		}
 	}
@@ -294,7 +313,7 @@ func (c *Client) Cleanup(maxConcurrent int) {
 			if len(c.active) <= maxConcurrent {
 				break
 			}
-			c.active[x.id].t.Drop()
+			c.dropAndDelete(c.active[x.id])
 			delete(c.active, x.id)
 		}
 	}
@@ -304,11 +323,16 @@ func (c *Client) Shutdown() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for id, e := range c.active {
-		e.t.Drop()
+		c.dropAndDelete(e)
 		delete(c.active, id)
 	}
 	if c.client != nil {
 		_ = c.client.Close()
 		c.client = nil
+	}
+	if c.dataDir != "" && c.dataDir != "/" {
+		if err := os.RemoveAll(c.dataDir); err != nil {
+			log.Printf("[bt] shutdown removeAll %q: %v", c.dataDir, err)
+		}
 	}
 }
