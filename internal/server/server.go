@@ -42,7 +42,7 @@ type Manifest struct {
 func baseManifest() Manifest {
 	return Manifest{
 		ID:          "community.jackstream",
-		Version:     "1.0.0",
+		Version:     "1.1.0",
 		Name:        "jackstream",
 		Description: "Stream torrents from your Jackett instance directly in Stremio. Self-hosted, no debrid required.",
 		Resources:   []string{"stream"},
