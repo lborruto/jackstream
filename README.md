@@ -47,6 +47,7 @@ Stremio app
 
 ## Features
 
+- 🪶 Static Go binary — ~26 MB image on `scratch` base
 - 🧲 Direct streaming from Jackett results, no debrid, no qBittorrent
 - 🔒 Private-tracker friendly: uses Jackett's proxied `.torrent` URLs with passkeys; DHT / LSD / µTP disabled
 - 🔐 HTTPS out of the box via a bundled wildcard cert — no reverse proxy needed for LAN clients
@@ -93,9 +94,11 @@ services:
 ```bash
 git clone https://github.com/lborruto/jackstream.git
 cd jackstream
-npm install
-npm start
+go build -o jackstream ./cmd/jackstream
+./jackstream
 ```
+
+Requires Go 1.24+. All deps are stdlib except `github.com/anacrolix/torrent` (fetched automatically on build).
 
 ## Configuration
 
@@ -213,7 +216,7 @@ Most often because the container restarted (e.g. Komodo redeploy) and the in-mem
 
 ## Contributing
 
-PRs welcome. Please run `npm test` and `npm run lint` before opening one.
+PRs welcome. Please run `go test ./...` and `go vet ./...` before opening one.
 
 ## License
 
