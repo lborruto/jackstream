@@ -1,27 +1,110 @@
-# jackstream
+<h1 align="center">jackstream</h1>
 
-[![Docker Pulls](https://img.shields.io/docker/pulls/lborruto/jackstream.svg)](https://hub.docker.com/r/lborruto/jackstream)
-[![GHCR](https://img.shields.io/badge/ghcr.io-lborruto%2Fjackstream-blue)](https://ghcr.io/lborruto/jackstream)
-[![CI](https://github.com/lborruto/jackstream/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/lborruto/jackstream/actions)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Go](https://img.shields.io/badge/go-1.24%2B-00ADD8.svg)](https://go.dev)
+<p align="center">
+  <strong>A Stremio addon that streams torrents from your Jackett. Self-hosted, one container.</strong><br>
+  Pick a movie or an episode in Stremio and the torrents Jackett finds appear as sources; the addon downloads what you watch and serves it to the player. A static Go binary in a 20 MB image, no debrid, no qBittorrent, no volumes.
+</p>
 
-Self-hosted Stremio addon — query your Jackett and stream torrents instantly via an embedded BitTorrent client. Static Go binary, ~20 MB Docker image, no debrid, no qBittorrent, no volumes.
+<p align="center">
+  <a href="https://hub.docker.com/r/lborruto/jackstream"><img alt="Docker pulls" src="https://img.shields.io/docker/pulls/lborruto/jackstream.svg"></a>
+  <a href="https://ghcr.io/lborruto/jackstream"><img alt="GHCR" src="https://img.shields.io/badge/ghcr.io-lborruto%2Fjackstream-blue"></a>
+  <a href="https://github.com/lborruto/jackstream/actions/workflows/docker-publish.yml"><img alt="CI" src="https://github.com/lborruto/jackstream/actions/workflows/docker-publish.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="Licence: MIT" src="https://img.shields.io/badge/license-MIT-green.svg"></a>
+</p>
 
-## Quick start (homelab on LAN)
+## What it does
 
-1. On your homelab/server:
-   ```bash
-   docker compose up -d
-   ```
-2. From any device on the same LAN, open `http://<server-ip>:7000/configure`.
-3. Fill in your Jackett URL + API key, your TMDB API key. For **Addon public URL** just enter your server's LAN IP (e.g. `192.168.0.15`) — the page auto-converts it to an HTTPS URL (`https://192-168-0-15.local-ip.medicmobile.org:7001`) so Stremio clients on other devices can reach it with a valid TLS cert.
-4. Click *Install in Stremio* — the native Stremio app opens and installs the addon.
-5. Pick a movie or episode — Jackett torrents appear as sources.
+- **Jackett results as Stremio sources.** Open a movie or an episode (anime included, through
+  category `5070`) and the torrents Jackett returns are listed as streams, sorted by quality,
+  source, HDR and seeders. Nothing goes through a debrid service or a separate torrent client.
+- **Streams through its own BitTorrent client.** The addon embeds anacrolix/torrent. Pieces are
+  fetched in playback order with 16 MB of readahead, so only the parts you watch are downloaded.
+  Idle torrents, and their pieces on disk, are removed after 30 minutes.
+- **Private-tracker friendly.** The `.torrent` is downloaded through Jackett's proxied URL, so
+  the announce URLs carry your passkeys. DHT, LSD and µTP are off.
+- **HTTPS on your LAN with no certificate to manage.** A wildcard certificate from
+  `local-ip.medicmobile.org` gives any LAN IP a valid HTTPS name, which Stremio clients on other
+  devices need. The addon fetches the current certificate itself and swaps it in while running:
+  no reverse proxy, no rebuild when it rotates. See [HTTPS](#https) for how it works and what it
+  costs.
+- **Better searches through TMDB.** The IMDB id is resolved to the localised and original titles,
+  and Jackett is searched in parallel for each variant.
+- **Filters of your own.** Preferred audio language, a quality floor and ceiling, size bounds and
+  blacklisted keywords, all optional. Quality, source, HDR, codec and audio are detected from
+  the release name.
+- **Your settings live in the addon URL.** Credentials and filters are encoded in the URL that
+  Stremio installs; the server stores nothing. The configure page keeps your inputs in the
+  browser's localStorage, and `/<config>/configure` can be bookmarked.
+- **Small.** A static Go binary on a `scratch` image: about 20 MB, under 50 ms to start, about
+  30 MB of memory. One container, no volumes, `linux/amd64` and `linux/arm64`.
 
-No domain, no cert management, no per-device trust setup. HTTPS uses a wildcard cert from `local-ip.medicmobile.org` (see [HTTPS details](#https-details) for how it works and its tradeoffs).
+## Get started
 
-## Architecture
+**You need:** Docker with Compose on the host, a running [Jackett](https://github.com/Jackett/Jackett)
+the container can reach, a free [TMDB API key](https://www.themoviedb.org/settings/api), and the
+Stremio app on the devices you watch on.
+
+Put this in a `docker-compose.yml` (the one in the repository is the same):
+
+```yaml
+services:
+  jackstream:
+    image: ghcr.io/lborruto/jackstream:latest
+    container_name: jackstream
+    ports:
+      - "7000:7000"   # HTTP (configure page + localhost Stremio)
+      - "7001:7001"   # HTTPS (for Stremio clients on other LAN devices)
+    restart: unless-stopped
+```
+
+```bash
+docker compose up -d
+```
+
+Or without Compose:
+
+```bash
+docker run -d --name jackstream \
+  -p 7000:7000 -p 7001:7001 \
+  --restart unless-stopped \
+  ghcr.io/lborruto/jackstream:latest
+```
+
+Then:
+
+1. **Open the configure page** at `http://<server-ip>:7000/configure` from any device on your
+   LAN.
+2. **Fill in** the Jackett URL (`http://<server-ip>:9117`, say) and its API key, the TMDB API
+   key, and under **Addon public URL / LAN IP** your server's LAN IP, `192.168.1.10` for
+   example. The page turns it into the HTTPS URL that Stremio clients on other devices can reach
+   with a valid certificate: `https://192-168-1-10.local-ip.medicmobile.org:7001`.
+3. **Test Jackett** and **Test TMDB** ping both from the server, so you know the settings work
+   before you install.
+4. **Advanced filters** (optional): expand the section to set a language preference, quality
+   bounds, size limits or blacklisted keywords. See [Advanced filters](#advanced-filters).
+5. **Install in Stremio.** The native Stremio app opens and installs the addon. The HTTPS URL is
+   shown next to the button too, to paste into Stremio by hand on a device without a browser,
+   a TV for instance.
+6. **Pick a movie or an episode.** Jackett's torrents appear as sources.
+
+No domain, no certificate to manage, no per-device trust setup.
+
+Reloading `/configure` fills the form again from the browser's localStorage. To carry the full
+config to another browser, bookmark `http://<server-ip>:7000/<base64>/configure`.
+
+### From source
+
+```bash
+git clone https://github.com/lborruto/jackstream.git
+cd jackstream
+go build -o jackstream ./cmd/jackstream
+./jackstream
+```
+
+Needs Go 1.24 or newer. Every dependency is in the standard library except
+`github.com/anacrolix/torrent`, which `go build` fetches.
+
+## How it works
 
 ```
 Stremio app
@@ -40,111 +123,57 @@ Stremio app
 [anacrolix/torrent singleton]
     │
     ├─ Download .torrent via Jackett (with passkeys)
-    ├─ Reader-driven piece prioritization (responsive + 16 MB readahead) —
+    ├─ Reader-driven piece prioritization (responsive + 16 MB readahead):
     │  only the parts you actually watch are downloaded
     ├─ Wait for torrent metadata, then serve via http.ServeContent (Range-aware)
     └─ Clean up idle torrents + their on-disk pieces, respect maxConcurrentTorrents
 ```
 
-## Features
-
-- 🪶 Static Go binary — ~20 MB Docker image on `scratch` base, <50 ms startup, ~30 MB RSS
-- 🧲 Direct streaming from Jackett results, no debrid, no qBittorrent
-- 🔒 Private-tracker friendly: uses Jackett's proxied `.torrent` URLs with passkeys; DHT / LSD / µTP disabled
-- 🔐 HTTPS out of the box via a self-refreshing wildcard cert — no reverse proxy, no rebuilds when it rotates
-- ⚙️ Per-user credentials encoded in the addon URL (zero server-side storage)
-- 💾 Client-side config persistence (localStorage) + bookmarkable `/<config>/configure` URL
-- 🎬 Movies + TV series (anime covered via category `5070`)
-- 🌍 TMDB-powered title resolution with localized + original-title variants for better search coverage
-- 🏷️ Quality / source / HDR / codec / audio detection
-- 🎚️ Advanced filters: preferred language, quality floor/ceiling, size bounds, blacklist keywords
-- 📦 Single Docker container, no volumes, multi-arch (amd64 + arm64)
-
-## Prerequisites
-
-- A running **Jackett** instance reachable from this container.
-- A free **TMDB** API key → <https://www.themoviedb.org/settings/api>.
-- Docker + Docker Compose on the host.
-
-## Installation
-
-### Docker (one-liner)
-
-```bash
-docker run -d --name jackstream \
-  -p 7000:7000 -p 7001:7001 \
-  --restart unless-stopped \
-  ghcr.io/lborruto/jackstream:latest
-```
-
-### Docker Compose
-
-```yaml
-services:
-  jackstream:
-    image: ghcr.io/lborruto/jackstream:latest
-    container_name: jackstream
-    ports:
-      - "7000:7000"   # HTTP (configure page + localhost Stremio)
-      - "7001:7001"   # HTTPS (for Stremio clients on other LAN devices)
-    restart: unless-stopped
-```
-
-### From source (development)
-
-```bash
-git clone https://github.com/lborruto/jackstream.git
-cd jackstream
-go build -o jackstream ./cmd/jackstream
-./jackstream
-```
-
-Requires Go 1.24+. All deps are stdlib except `github.com/anacrolix/torrent` (fetched automatically on build).
-
-## Configuration
-
-1. Open `http://<server-ip>:7000/configure` from any device on your LAN.
-2. Fill in:
-   - **Jackett URL** (e.g. `http://<server-ip>:9117`) and its API key.
-   - **TMDB API key**.
-   - **Addon public URL / LAN IP** — just type your server's LAN IP (e.g. `192.168.0.15`). The page auto-converts it to a valid HTTPS URL (see [HTTPS details](#https-details)).
-3. Click *Test Jackett* / *Test TMDB* to verify connectivity (live ping of both).
-4. *(Optional)* expand **Advanced filters** to set language preference, quality bounds, size limits, or blacklist keywords.
-5. Click *Install in Stremio* — the native Stremio app opens and installs.
-6. The HTTPS URL is also shown so you can paste it into Stremio manually on any device (useful for TVs without a browser).
-
-Your inputs are saved to `localStorage` so reloading `/configure` re-populates the form. You can also bookmark `http://<server-ip>:7000/<base64>/configure` to carry the full config between browsers.
-
 ## Advanced filters
 
-All optional. Defaults produce the same behavior as earlier versions.
+All optional. With the defaults, results are the same as in earlier versions.
 
-| Setting                      | Effect                                                                                                                                                  |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Preferred audio language** | Sort boost for matching audio (FRENCH / MULTI / VOSTFR / ENG). `FRENCH` also boosts MULTI releases; same for `ENG`. Does not hide non-matching results. |
-| **Min / Max quality**        | Hard filter. Drops results above/below the chosen tier.                                                                                                 |
-| **Min size (MB)**            | Drops "fake" low-size releases.                                                                                                                         |
-| **Max size (GB)**            | Drops oversized releases (useful for slow connections / small disks).                                                                                   |
-| **Blacklist keywords**       | Comma-separated list (case-insensitive, word-boundary). Drops results whose title matches any keyword — e.g. `CAM, HDCAM, TELESYNC`.                    |
+| Setting | Effect |
+|---|---|
+| **Preferred audio language** | Sort boost for matching audio (FRENCH, MULTI, VOSTFR, ENG). `FRENCH` also boosts MULTI releases; so does `ENG`. Results that do not match are not hidden. |
+| **Min / Max quality** | Hard filter. Drops results above or below the chosen tier. |
+| **Min size (MB)** | Drops "fake" low-size releases. |
+| **Max size (GB)** | Drops oversized releases (useful on a slow connection or a small disk). |
+| **Blacklist keywords** | Comma-separated list, case-insensitive, matched on word boundaries. Drops results whose title contains any keyword, `CAM, HDCAM, TELESYNC` for example. |
 
-All filters are stored in the base64-encoded addon URL, so different Stremio installs can use different filter profiles against the same backend.
+Every filter is part of the base64-encoded addon URL, so two Stremio installs can use different
+filter profiles against the same server.
 
-## HTTPS details
+## HTTPS
 
-jackstream uses the wildcard TLS cert from <https://local-ip.medicmobile.org> — a community service that issues a public `*.local-ip.medicmobile.org` Let's Encrypt certificate and operates a DNS server where `<dashed-ip>.local-ip.medicmobile.org` resolves to `<ip>`. This gives you valid HTTPS for any LAN IP with zero setup.
+jackstream uses the wildcard TLS certificate from <https://local-ip.medicmobile.org>, a
+community service that issues a public Let's Encrypt certificate for
+`*.local-ip.medicmobile.org` and runs a DNS server where `<dashed-ip>.local-ip.medicmobile.org`
+resolves to `<ip>`. Any LAN IP gets a valid HTTPS name with nothing to configure.
 
-The cert is **refreshed automatically at runtime**: on startup and every 12 h the addon re-fetches the current cert + key from the service and hot-swaps it into the running HTTPS listener — no restart, no image rebuild when Let's Encrypt rotates it (~every 60 days). An embedded copy is baked into the binary as a fallback so HTTPS still comes up when the service is briefly unreachable.
+The certificate is **refreshed while the addon runs**: on startup and every 12 hours it fetches
+the current certificate and key from the service and swaps them into the running HTTPS
+listener. No restart and no image rebuild when Let's Encrypt rotates it, about every 60 days. A
+copy is embedded in the binary as a fallback, so HTTPS still comes up when the service cannot be
+reached for a while.
 
-The HTTPS listener binds on port **7001** alongside the HTTP listener on **7000**. Stremio clients hit the HTTPS URL; the TCP connection still goes directly to your LAN host.
+The HTTPS listener is on port **7001**, next to the HTTP listener on **7000**. Stremio clients
+use the HTTPS URL; the TCP connection still goes straight to your LAN host.
 
 ### Tradeoffs
 
-- The TLS private key is public (by design — anyone can download it from the service). Anyone who can also control DNS on your network could MITM; on a trusted home LAN this is a non-issue. Not suitable for addons exposed to the public internet.
-- The service is community-run (Medic Mobile). If it goes offline, the last successfully fetched cert keeps serving until it expires (a warning is logged from 14 days out); after that, switch to your own cert (below).
+- **The private key is public.** That is how the service works: anyone can download it. Anyone
+  who also controls DNS on your network could sit in the middle of the connection. On a trusted
+  home LAN that is not a concern. It is not suitable for an addon exposed to the public
+  internet.
+- **The service is community-run** (Medic Mobile). If it goes offline, the last certificate the
+  addon fetched keeps serving until it expires (a warning is logged from 14 days before). After
+  that, switch to your own certificate, below.
 
-### Using your own cert instead
+### Your own certificate
 
-Mount a cert + key and point the addon at them (this pins your cert — auto-refresh is disabled and renewal is up to you):
+Mount a certificate and key and point the addon at them. This pins your certificate:
+auto-refresh is off and renewal is yours to handle.
 
 ```yaml
 services:
@@ -161,103 +190,88 @@ services:
     restart: unless-stopped
 ```
 
-Works with Caddy-issued certs, mkcert, Let's Encrypt, or anything else.
+Works with certificates from Caddy, mkcert, Let's Encrypt or anything else.
 
-### Disabling HTTPS
+### HTTP only
 
-Set `HTTPS_DISABLED=1` to skip the HTTPS listener (HTTP-only). Useful if you front the addon with Caddy / Nginx / Traefik that already terminates TLS.
+Set `HTTPS_DISABLED=1` to skip the HTTPS listener. Useful when Caddy, Nginx or Traefik already
+terminates TLS in front of the addon.
 
-### Refreshing the embedded fallback cert
+### Refreshing the embedded fallback certificate
 
-Rotation is handled at runtime, so this is **not needed for running installs**. The embedded copy only matters for the first seconds after a cold start while the fresh cert is fetched — refreshing it occasionally before a release keeps that window valid:
+Rotation happens at runtime, so running installs do not need this. The embedded copy only
+matters for the first seconds after a cold start, while the current certificate is being
+fetched. Refreshing it now and then before a release keeps that window covered:
 
 ```bash
 ./scripts/refresh-certs.sh
 git commit -am "chore: refresh embedded local-ip fallback cert"
 ```
 
+## Configuration reference
+
+Everything is an environment variable, and every one has a default.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `PORT` | `7000` | Port of the HTTP listener. |
+| `DATA_DIR` | `/tmp/jackstream` | Where in-flight torrent pieces are stored. Cleaned up automatically. |
+| `CACHE_TTL_MINUTES` | `1440` | How long TMDB results are cached. |
+| `REQUEST_TIMEOUT_MS` | `8000` | Timeout for Jackett and TMDB requests. |
+| `STREAM_READY_TIMEOUT_S` | `60` | Longest wait for the first pieces. |
+| `TORRENT_IDLE_TIMEOUT_MIN` | `30` | Idle minutes before a torrent is stopped and its pieces deleted. |
+| `HTTPS_PORT` | `7001` | Port of the HTTPS listener. |
+| `HTTPS_CERT_PATH` | unset | Path to your own TLS certificate (PEM). Turns off certificate auto-refresh. |
+| `HTTPS_KEY_PATH` | unset | Path to your own TLS private key (PEM). Both paths must be set. |
+| `HTTPS_DISABLED` | unset | `1` disables the HTTPS listener. |
+
 ## FAQ
 
 **Does it work with private trackers?**
-Yes — Jackett proxies the `.torrent` URL so announce URLs carry passkeys. DHT and LSD are disabled in the BitTorrent client to avoid leaking infohashes to the public swarm.
+Yes. Jackett proxies the `.torrent` URL, so the announce URLs carry your passkeys. DHT and LSD
+are disabled in the BitTorrent client, so infohashes are not leaked to the public swarm.
 
-**Why did I see "Stream session expired"?**
-The in-memory torrent map has a 2 h TTL. Go back to the source list and click the stream again — it's instant.
+**I saw "Stream session expired".**
+The in-memory torrent map keeps entries for 2 hours. Go back to the source list and click the
+stream again; it starts again at once.
 
-**Does it seed after I'm done watching?**
-No — V1 stops idle torrents after `TORRENT_IDLE_TIMEOUT_MIN` (default 30 min) and frees the disk. Seeding is on the V2 roadmap.
+**Does it seed after I finish watching?**
+No. V1 stops idle torrents after `TORRENT_IDLE_TIMEOUT_MIN` (30 minutes by default) and frees
+the disk. Seeding is planned for V2.
 
-**Why not debrid?**
-Out of scope. The spec targets homelab-only streaming with zero third-party dependencies.
+**Why no debrid?**
+Out of scope: the project targets streaming inside a homelab, with no third-party service.
 
-**Why an embedded BitTorrent client instead of qBittorrent?**
-No shared volume, no second container, native HTTP Range support, and the Jackett-proxied `.torrent` carries the passkey so private trackers work out of the box.
+**Why an embedded BitTorrent client rather than qBittorrent?**
+No shared volume, no second container, HTTP Range requests served natively, and the `.torrent`
+proxied by Jackett carries the passkey, so private trackers work with no extra setup.
 
-**Stremio desktop vs TV?**
-Both work. `notWebReady: true` tells Stremio to use the native player rather than the web player.
+**Stremio desktop or TV?**
+Both. `notWebReady: true` tells Stremio to use its native player rather than the web player.
 
-**The *Install in Stremio* button did nothing / the URL lost the `:7001` port.**
-Some Stremio clients (older Windows builds in particular) mishandle the port in `stremio://` deep-link URIs. Workaround: copy the `https://…:7001/<base64>/manifest.json` URL shown below the button, then in Stremio click the puzzle-piece icon → paste into *Add-on Repository URL*.
+**The *Install in Stremio* button did nothing, or the URL lost the `:7001` port.**
+Some Stremio clients (older Windows builds in particular) mishandle the port in `stremio://`
+deep links. Copy the `https://…:7001/<base64>/manifest.json` URL shown under the button, then
+in Stremio click the puzzle-piece icon and paste it into *Add-on Repository URL*.
 
-**Loading failed when I click a stream.**
-Most often because the container restarted (e.g. Komodo redeploy) and the in-memory `torrentStore` was wiped while Stremio still had a cached list of stream URLs. Close and re-open the movie in Stremio to force a fresh stream-list fetch.
+**Loading failed when I clicked a stream.**
+Most often the container restarted (a redeploy, say) and the in-memory `torrentStore` was wiped
+while Stremio still held a cached list of stream URLs. Close and reopen the movie in Stremio to
+fetch a fresh list.
 
-## Environment variables
+## Updating
 
-| Variable                   | Default           | Meaning                                                              |
-| -------------------------- | ----------------- | -------------------------------------------------------------------- |
-| `PORT`                     | `7000`            | Port to listen on                                                     |
-| `DATA_DIR`                 | `/tmp/jackstream` | Where in-flight torrent pieces are stored (auto-cleaned)               |
-| `CACHE_TTL_MINUTES`        | `1440`            | TMDB cache TTL                                                         |
-| `REQUEST_TIMEOUT_MS`       | `8000`            | Jackett/TMDB timeout                                                   |
-| `STREAM_READY_TIMEOUT_S`   | `60`              | Max wait for first pieces                                              |
-| `TORRENT_IDLE_TIMEOUT_MIN` | `30`              | Idle minutes before stopping a torrent and deleting its pieces         |
-| `HTTPS_PORT`               | `7001`            | Port for the HTTPS listener                                            |
-| `HTTPS_CERT_PATH`          | _(unset)_         | Path to your own TLS certificate (PEM). Disables cert auto-refresh    |
-| `HTTPS_KEY_PATH`           | _(unset)_         | Path to your own TLS private key (PEM). Both paths must be set        |
-| `HTTPS_DISABLED`           | _(unset)_         | Set to `1` to disable the HTTPS listener                               |
+```bash
+docker compose pull && docker compose up -d
+```
 
-## Changelog
-
-### v1.2.0 — Self-refreshing HTTPS + leaner downloads (2026-08-14)
-
-- 🔐 **TLS cert now auto-refreshes at runtime.** The addon fetches the current `local-ip.medicmobile.org` cert on startup and every 12 h and hot-swaps it into the HTTPS listener — no more image rebuild every ~60 days. The embedded cert is now only a cold-start fallback; a warning is logged if refresh keeps failing within 14 days of expiry. `HTTPS_CERT_PATH`/`HTTPS_KEY_PATH` still pin your own cert (auto-refresh off).
-- 📉 **Streams no longer download the whole file in the background.** Piece prioritization is now driven purely by playback position (+16 MB readahead), so skipping through or abandoning a stream no longer pulls the full release to disk. Less bandwidth, less disk, kinder to private-tracker ratios.
-- 💾 `DATA_DIR` env var to choose where in-flight pieces are stored (default `/tmp/jackstream`).
-- 🏷️ Detected codec (x264 / x265 / AV1) now shown in the stream description.
-- 🧹 Internal polish: fixed a data race on the max-concurrent-torrents setting, expired stream-session entries are now reclaimed even when never re-read, torrent-file fetches are time- and size-bounded, disk deletion no longer blocks stream requests, and dead code was removed.
-
-No breaking changes. Existing addon install URLs continue to work unchanged.
-
-### v1.1.1 — Disk cleanup (2026-04-23)
-
-- 🗑️ **Fix:** `bt.Cleanup()` and `Shutdown()` now delete downloaded pieces from disk, not just from memory. Previously the container's writable layer (`/tmp/jackstream`) grew unboundedly until `docker rm`. Long-running containers now reclaim disk as torrents go idle or at shutdown.
-- Internal: `dropAndDelete()` helper replaces direct `torrent.Drop()` calls; `Shutdown()` additionally wipes the `DataDir` to catch orphan files from fetch-fail paths.
-
-No user-facing behavior change. Existing installs continue to work; upgrade at any time.
-
-### v1.1.0 — Go rewrite (2026-04-23)
-
-Full rewrite from Node.js to Go with strict behavioral parity. Same URLs, same config format, same UX, but:
-
-- 🪶 **93% smaller Docker image** (~280 MB → ~20 MB on `scratch` base)
-- 🚀 **<50 ms startup** vs ~250 ms Node
-- 💾 **~30 MB RSS** vs ~100–150 MB
-- 🛡️ **No more `utp-native` segfaults** — anacrolix/torrent is pure Go, µTP disabled by default
-- 🎯 **HTTP Range streaming via `http.ServeContent`** replaces ~245 lines of manual Range handling
-
-No user-facing changes. Existing addon install URLs continue to work unchanged.
-
-### v1.0.0 — Initial release (2026-04-22)
-
-- Node.js 20 + stremio-addon-sdk + webtorrent
-- HTTP + HTTPS listeners (ports 7000/7001) with bundled `local-ip.medicmobile.org` cert
-- Configure page with localStorage persistence + advanced filters
+What changed in each version is in [CHANGELOG.md](CHANGELOG.md). No release so far has changed
+the addon URL format: URLs already installed in Stremio keep working.
 
 ## Contributing
 
-PRs welcome. Please run `go test ./...` and `go vet ./...` before opening one.
+Pull requests are welcome. Run `go test ./...` and `go vet ./...` before opening one.
 
-## License
+## Licence
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).
