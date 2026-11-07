@@ -101,7 +101,7 @@ go build -o jackstream ./cmd/jackstream
 ./jackstream
 ```
 
-Needs Go 1.24 or newer. Every dependency is in the standard library except
+Needs Go 1.26 or newer. Every dependency is in the standard library except
 `github.com/anacrolix/torrent`, which `go build` fetches.
 
 ## How it works
