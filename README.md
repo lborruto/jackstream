@@ -8,8 +8,8 @@
 <p align="center">
   <a href="https://hub.docker.com/r/lborruto/jackstream"><img alt="Docker pulls" src="https://img.shields.io/docker/pulls/lborruto/jackstream.svg"></a>
   <a href="https://ghcr.io/lborruto/jackstream"><img alt="GHCR" src="https://img.shields.io/badge/ghcr.io-lborruto%2Fjackstream-blue"></a>
-  <a href="https://github.com/lborruto/jackstream/actions/workflows/docker-publish.yml"><img alt="CI" src="https://github.com/lborruto/jackstream/actions/workflows/docker-publish.yml/badge.svg"></a>
-  <a href="LICENSE"><img alt="Licence: MIT" src="https://img.shields.io/badge/license-MIT-green.svg"></a>
+  <a href="https://github.com/lborruto/jackstream/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/lborruto/jackstream/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="LICENSE"><img alt="Licence: MIT" src="https://img.shields.io/badge/licence-MIT-blue.svg"></a>
 </p>
 
 ## What it does
@@ -37,6 +37,14 @@
   browser's localStorage, and `/<config>/configure` can be bookmarked.
 - **Small.** A static Go binary on a `scratch` image: about 20 MB, under 50 ms to start, about
   30 MB of memory. One container, no volumes, `linux/amd64` and `linux/arm64`.
+
+## Security
+
+Read this before you install. The addon has no login: anyone who can reach its ports can use
+it, so keep it on your home network and never publish the ports to the internet. Your Jackett
+and TMDB API keys travel inside the addon URL (encoded, not encrypted): treat that URL like a
+password. The default HTTPS key is public by design (see [HTTPS](#https)). The full model, and
+how to report a vulnerability privately, is in [SECURITY.md](SECURITY.md).
 
 ## Get started
 
@@ -103,31 +111,6 @@ go build -o jackstream ./cmd/jackstream
 
 Needs Go 1.26 or newer. Every dependency is in the standard library except
 `github.com/anacrolix/torrent`, which `go build` fetches.
-
-## How it works
-
-```
-Stremio app
-    │ GET /{config}/manifest.json
-    │ GET /{config}/stream/{type}/{id}.json
-    ▼
-[Go net/http + Stremio addon]
-    │
-    ├─ Resolve IMDB id → titles via TMDB (24 h cache)
-    ├─ Search Jackett in parallel across title variants
-    ├─ Parse + sort torrents (quality > source > hdr > seeders)
-    └─ Return streams pointing back to /stream/{config}/{torrentId}/{fileIdx}
-
-    │ GET /stream/:config/:torrentId/:fileIdx
-    ▼
-[anacrolix/torrent singleton]
-    │
-    ├─ Download .torrent via Jackett (with passkeys)
-    ├─ Reader-driven piece prioritization (responsive + 16 MB readahead):
-    │  only the parts you actually watch are downloaded
-    ├─ Wait for torrent metadata, then serve via http.ServeContent (Range-aware)
-    └─ Clean up idle torrents + their on-disk pieces, respect maxConcurrentTorrents
-```
 
 ## Advanced filters
 
@@ -197,17 +180,6 @@ Works with certificates from Caddy, mkcert, Let's Encrypt or anything else.
 Set `HTTPS_DISABLED=1` to skip the HTTPS listener. Useful when Caddy, Nginx or Traefik already
 terminates TLS in front of the addon.
 
-### Refreshing the embedded fallback certificate
-
-Rotation happens at runtime, so running installs do not need this. The embedded copy only
-matters for the first seconds after a cold start, while the current certificate is being
-fetched. Refreshing it now and then before a release keeps that window covered:
-
-```bash
-./scripts/refresh-certs.sh
-git commit -am "chore: refresh embedded local-ip fallback cert"
-```
-
 ## Configuration reference
 
 Everything is an environment variable, and every one has a default.
@@ -265,13 +237,28 @@ fetch a fresh list.
 docker compose pull && docker compose up -d
 ```
 
-What changed in each version is in [CHANGELOG.md](CHANGELOG.md). No release so far has changed
-the addon URL format: URLs already installed in Stremio keep working.
+`latest` is the newest release; to stay on a version, use its tag (`ghcr.io/lborruto/jackstream:1.2.0`,
+or `:1.2` for its fixes). What changed in each version is in [CHANGELOG.md](CHANGELOG.md). No
+release so far has changed the addon URL format: URLs already installed in Stremio keep working.
 
-## Contributing
+## Help and docs
 
-Pull requests are welcome. Run `go test ./...` and `go vet ./...` before opening one.
+| I want to… | Read |
+|---|---|
+| Know what it can see and what it does not protect | [SECURITY.md](SECURITY.md) |
+| Report a bug or ask for a feature | [Issues](https://github.com/lborruto/jackstream/issues/new/choose) |
+| Report a vulnerability privately | [Security advisories](https://github.com/lborruto/jackstream/security/advisories/new) |
+| Build it, run the checks, send a change | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| See what changed | [CHANGELOG.md](CHANGELOG.md) |
 
-## Licence
+## Licence and credits
 
-MIT, see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE). Streaming is done by
+[anacrolix/torrent](https://github.com/anacrolix/torrent) (MPL-2.0). HTTPS on a LAN uses the
+certificate published by [local-ip.medicmobile.org](https://local-ip.medicmobile.org).
+
+## Not affiliated, no warranty
+
+jackstream is not affiliated with, endorsed by or supported by Stremio, Jackett, TMDB or Medic
+Mobile. It is provided as is, with no warranty (see the licence). What you stream, and from
+where, is your responsibility.
