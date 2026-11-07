@@ -1,0 +1,204 @@
+name: Release
+
+# A tag vX.Y.Z on a commit of main runs CI on the tagged commit, checks that the version in the
+# code (internal/server/server.go, the one the manifest reports) is the tag's, publishes the
+# multi-arch image (linux/amd64, linux/arm64) with provenance and SBOM attestations, scans the
+# pushed digest with Trivy, then creates the GitHub release with that version's section of
+# CHANGELOG.md as notes. The image goes to ghcr.io/<owner>/jackstream as X.Y.Z, X.Y and latest,
+# and to Docker Hub under the same tags when the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN secrets
+# are set. A push to main publishes nothing: `latest` is always the newest release.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+# Tags queue rather than cancel one another: a cancelled run could leave an image published
+# without its release.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+# Every action is pinned to the commit of a release at least two weeks old (resolved from its
+# tag on 2026-11-07); the comment names the release and the date it was published. Dependabot
+# updates the version but not the date; its 14-day cooldown keeps the age rule. No Actions cache
+# feeds the build: the published image is built from scratch.
+jobs:
+  # A release is only ever made from reviewed code: the tagged commit must be on main.
+  on-main:
+    name: Tagged commit is on main
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      # Asked of GitHub's API rather than with git fetch: the checkout keeps no credentials.
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # main's commit by its full branch name, so a tag called "main" cannot stand in for it.
+          main_sha="$(gh api "repos/$GH_REPO/git/ref/heads/main" -q .object.sha)"
+          status="$(gh api "repos/$GH_REPO/compare/$main_sha...$GITHUB_SHA" -q .status)"
+          echo "compared with main ($main_sha): $status"
+          case "$status" in identical | behind) ;; *)
+            echo "::error::$GITHUB_REF_NAME points to a commit that is not on main ($status)"
+            exit 1 ;;
+          esac
+
+  checks:
+    name: CI on the tagged commit
+    needs: on-main
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  # Version and notes are checked before anything is built or pushed.
+  prepare:
+    name: Version and notes
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (2026-07-20)
+        with:
+          persist-credentials: false
+      - name: The code's version is the tag's
+        run: |
+          version="$(sed -n 's/^const Version = "\(.*\)"$/\1/p' internal/server/server.go)"
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::internal/server/server.go says '$version' but the tag is $TAG; bump Version before tagging"
+            exit 1
+          fi
+      # The notes are the `## [X.Y.Z]` section of CHANGELOG.md (Keep a Changelog); a tag without
+      # its section fails here, before anything is published, so the changelog is written before
+      # the tag.
+      - name: Notes from CHANGELOG.md
+        run: |
+          version="${TAG#v}"
+          out="$RUNNER_TEMP/release"
+          mkdir -p "$out"
+          awk -v heading="## [$version]" '
+            index($0, heading) == 1 { found = 1; next }
+            /^## / { found = 0 }
+            found
+          ' CHANGELOG.md >"$out/notes.md"
+          if ! grep -q '[^[:space:]]' "$out/notes.md"; then
+            echo "::error::CHANGELOG.md has no '## [$version]' section; add it before tagging v$version"
+            exit 1
+          fi
+          cat "$out/notes.md"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2 (2026-10-07)
+        with:
+          name: notes
+          path: ${{ runner.temp }}/release/notes.md
+          if-no-files-found: error
+          retention-days: 5
+
+  publish:
+    name: Multi-arch image (GHCR, Docker Hub)
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # Only the user name, to decide whether Docker Hub is a target; the token is read by the
+      # login step alone.
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (2026-07-20)
+        with:
+          persist-credentials: false
+      # The Dockerfile cross-compiles for the target platform: no emulation needed.
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1 (2026-09-16)
+      # GHCR always; Docker Hub too when its secrets are set.
+      - id: images
+        run: |
+          {
+            echo "list<<EOF"
+            echo "ghcr.io/${GITHUB_REPOSITORY_OWNER}/jackstream"
+            if [ -n "$DOCKERHUB_USERNAME" ]; then echo "docker.io/${DOCKERHUB_USERNAME}/jackstream"; fi
+            echo "EOF"
+          } >>"$GITHUB_OUTPUT"
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0 (2026-07-02)
+        env:
+          # Annotate the image index too, not only each platform's manifest.
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+        with:
+          images: ${{ steps.images.outputs.list }}
+          # vX.Y.Z → X.Y.Z, X.Y and latest (the default flavor adds latest on semver tags only).
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+          labels: |
+            org.opencontainers.image.title=jackstream
+            org.opencontainers.image.description=A Stremio addon that streams torrents from your Jackett. Self-hosted, one container.
+            org.opencontainers.image.licenses=MIT
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0 (2026-07-29)
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0 (2026-07-29)
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0 (2026-09-15)
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          provenance: mode=max
+          sbom: true
+      # The digest just pushed. Fixable HIGH and CRITICAL vulnerabilities fail the run, so no
+      # GitHub release is created.
+      - name: Trivy on the pushed image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0 (2026-04-22)
+        with:
+          scan-type: image
+          image-ref: ghcr.io/${{ github.repository_owner }}/jackstream@${{ steps.build.outputs.digest }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+  release:
+    name: GitHub release
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2 (2026-10-07)
+        with:
+          name: notes
+          path: release
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          {
+            echo
+            echo "---"
+            echo
+            echo "Image: \`ghcr.io/${GITHUB_REPOSITORY_OWNER}/jackstream:${TAG#v}\` (linux/amd64, linux/arm64)."
+            echo "Its build provenance and SBOM are attached to the image as attestations."
+          } >>release/notes.md
+          set --
+          case "$TAG" in *-*) set -- --prerelease ;; esac
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file release/notes.md "$@"

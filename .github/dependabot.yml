@@ -1,0 +1,34 @@
+version: 2
+# Weekly, grouped, and only for releases at least 14 days old (cooldown), matching the rule for
+# pinned actions. The docker entry moves the Go builder image (tag and digest); the Go version in
+# ci.yml and codeql.yml follows it by hand.
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 14
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 14
+    groups:
+      gomod:
+        patterns: ["*"]
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 14
+    groups:
+      base-images:
+        patterns: ["*"]

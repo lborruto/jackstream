@@ -2,7 +2,23 @@
 
 All notable changes to jackstream are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html). A tag `vX.Y.Z` publishes the image
+and creates the GitHub release, which takes its notes from that version's section below.
+
+## [Unreleased]
+
+### Changed
+
+- Images are published only when a version is released: `latest` is now the newest release
+  rather than the newest commit on `main`, and `sha-…` tags are no longer pushed. Each release
+  also gets a GitHub release with these notes, and its image carries build provenance and an
+  SBOM.
+
+### Security
+
+- The image is built with Go 1.26 (was 1.24, no longer patched), and the indirect dependencies
+  with known high-severity fixes are updated (`golang.org/x/net`, `x/crypto`, `x/text`,
+  OpenTelemetry). Building from source now needs Go 1.26.
 
 ## [1.2.0] - 2026-08-14
 
@@ -85,6 +101,7 @@ Initial release.
   certificate.
 - Configure page with localStorage persistence and advanced filters.
 
+[Unreleased]: https://github.com/lborruto/jackstream/compare/v1.2.0...HEAD
 [1.2.0]: https://github.com/lborruto/jackstream/compare/v1.1.2...v1.2.0
 [1.1.2]: https://github.com/lborruto/jackstream/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/lborruto/jackstream/compare/v1.1.0...v1.1.1
