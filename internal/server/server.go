@@ -20,7 +20,7 @@ import (
 	"github.com/lborruto/jackstream/internal/tmdb"
 )
 
-const Version = "1.2.0"
+const Version = "1.3.0"
 
 // configure.html is copied from ../../public/configure.html so that
 // //go:embed can consume it (embed does not follow symlinks). Regenerate with:
