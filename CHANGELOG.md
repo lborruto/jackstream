@@ -7,6 +7,11 @@ and creates the GitHub release, which takes its notes from that version's sectio
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-07
+
+A maintenance release: patched toolchain and dependencies, and images published per release.
+Existing addon install URLs keep working unchanged.
+
 ### Changed
 
 - Images are published only when a version is released: `latest` is now the newest release
