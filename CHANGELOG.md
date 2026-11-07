@@ -7,6 +7,13 @@ and creates the GitHub release, which takes its notes from that version's sectio
 
 ## [Unreleased]
 
+### Changed
+
+- Images are published only when a version is released: `latest` is now the newest release
+  rather than the newest commit on `main`, and `sha-…` tags are no longer pushed. Each release
+  also gets a GitHub release with these notes, and its image carries build provenance and an
+  SBOM.
+
 ### Security
 
 - The image is built with Go 1.26 (was 1.24, no longer patched), and the indirect dependencies

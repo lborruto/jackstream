@@ -1,0 +1,17 @@
+# gitleaks configuration: the default rules, plus one exception. CI runs gitleaks over the whole
+# history (every branch) at each push.
+title = "jackstream"
+
+[extend]
+useDefault = true
+
+# The fallback keypair embedded in the binary is the public *.local-ip.medicmobile.org
+# certificate and key: the service publishes both for anyone to download
+# (https://local-ip.medicmobile.org/key), and scripts/refresh-certs.sh fetches them from there.
+# It is not a secret of this project (README, "HTTPS" > "Tradeoffs"). It rotates about every
+# 60 days, so the exception is scoped to the private-key rule and to these two files only, not
+# to a value: a key anywhere else, or another kind of secret in these files, is still reported.
+[[allowlists]]
+description = "Public local-ip.medicmobile.org key, embedded as the HTTPS fallback"
+targetRules = ["private-key"]
+paths = ['''^certs/key\.pem$''', '''^internal/server/embed/key\.pem$''']
