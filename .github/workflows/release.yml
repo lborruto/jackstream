@@ -142,13 +142,13 @@ jobs:
             org.opencontainers.image.title=jackstream
             org.opencontainers.image.description=A Stremio addon that streams torrents from your Jackett. Self-hosted, one container.
             org.opencontainers.image.licenses=MIT
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0 (2026-07-29)
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.6.0 (2026-07-29)
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - if: env.DOCKERHUB_USERNAME != ''
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0 (2026-07-29)
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.6.0 (2026-07-29)
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
